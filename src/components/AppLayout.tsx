@@ -15,7 +15,9 @@ import {
   Wifi,
   Database,
   HelpCircle,
+  Sparkles,
 } from "lucide-react";
+import { useAppearance } from "./appearance-provider";
 
 const modules = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, key: "F1" },
@@ -32,6 +34,7 @@ const modules = [
 export default function AppLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const current = modules.find((m) => m.to === pathname) ?? modules[0];
+  const { appearance, setAppearance } = useAppearance();
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
@@ -115,6 +118,13 @@ export default function AppLayout() {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
+              <button
+                className="erp-btn"
+                onClick={() => setAppearance(appearance === "modern" ? "classic" : "modern")}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {appearance === "modern" ? "Visual Original" : "Visual Moderno"}
+              </button>
               <button className="erp-btn relative">
                 <Bell className="h-3.5 w-3.5" />
                 Alertas
