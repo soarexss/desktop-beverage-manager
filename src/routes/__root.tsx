@@ -66,9 +66,5 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return (
-    <AppLayout>
-      <Outlet />
-    </AppLayout>
-  );
+  return <AppLayout />;
 }
