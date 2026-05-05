@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VendasRouteImport } from './routes/vendas'
+import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as NotasRouteImport } from './routes/notas'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
@@ -21,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const VendasRoute = VendasRouteImport.update({
   id: '/vendas',
   path: '/vendas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsuariosRoute = UsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RelatoriosRoute = RelatoriosRouteImport.update({
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof FinanceiroRoute
   '/notas': typeof NotasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/vendas': typeof VendasRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof FinanceiroRoute
   '/notas': typeof NotasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/vendas': typeof VendasRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/financeiro': typeof FinanceiroRoute
   '/notas': typeof NotasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/usuarios': typeof UsuariosRoute
   '/vendas': typeof VendasRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/notas'
     | '/relatorios'
+    | '/usuarios'
     | '/vendas'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/notas'
     | '/relatorios'
+    | '/usuarios'
     | '/vendas'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/notas'
     | '/relatorios'
+    | '/usuarios'
     | '/vendas'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   FinanceiroRoute: typeof FinanceiroRoute
   NotasRoute: typeof NotasRoute
   RelatoriosRoute: typeof RelatoriosRoute
+  UsuariosRoute: typeof UsuariosRoute
   VendasRoute: typeof VendasRoute
 }
 
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/vendas'
       fullPath: '/vendas'
       preLoaderRoute: typeof VendasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/usuarios': {
+      id: '/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof UsuariosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/relatorios': {
@@ -203,6 +223,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceiroRoute: FinanceiroRoute,
   NotasRoute: NotasRoute,
   RelatoriosRoute: RelatoriosRoute,
+  UsuariosRoute: UsuariosRoute,
   VendasRoute: VendasRoute,
 }
 export const routeTree = rootRouteImport
