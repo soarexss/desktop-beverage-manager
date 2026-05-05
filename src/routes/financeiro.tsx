@@ -8,23 +8,20 @@ function Financeiro() {
   return (
     <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
+        {([
           ["Saldo em Caixa", "R$ 48.214,80", "success", TrendingUp],
           ["A Receber (30d)", "R$ 124.870,30", "info", TrendingUp],
           ["A Pagar (30d)", "R$ 87.420,15", "warning", TrendingDown],
           ["Inadimplência", "R$ 12.480,90", "danger", TrendingDown],
-        ].map(([l, v, k, I]) => {
-          const Icon = I as typeof TrendingUp;
-          return (
-            <div key={l as string} className="erp-panel flex items-center justify-between p-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-muted-foreground">{l}</div>
-                <div className="mt-1 text-xl font-bold tabular-nums">{v}</div>
-              </div>
-              <div className={`grid h-10 w-10 place-items-center rounded bg-${k}/15 text-${k}`}><Icon className="h-5 w-5" /></div>
+        ] as const).map(([l, v, k, Icon]) => (
+          <div key={l} className="erp-panel flex items-center justify-between p-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase text-muted-foreground">{l}</div>
+              <div className="mt-1 text-xl font-bold tabular-nums">{v}</div>
             </div>
-          );
-        })}
+            <div className={`grid h-10 w-10 place-items-center rounded bg-${k}/15 text-${k}`}><Icon className="h-5 w-5" /></div>
+          </div>
+        ))}
       </div>
 
       <Panel className="col-span-12 lg:col-span-6" title="Contas a Pagar" actions={<button className="erp-btn"><Plus className="h-3.5 w-3.5" />Lançar</button>} bodyClassName="p-0">
