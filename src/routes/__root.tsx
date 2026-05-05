@@ -1,4 +1,5 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import AppLayout from "../components/AppLayout";
 
 import appCss from "../styles.css?url";
 
@@ -29,11 +30,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "DistriBev ERP — Gestão de Distribuidora de Bebidas" },
+      { name: "description", content: "Sistema ERP completo para distribuidoras de bebidas: estoque, PDV, clientes, entregas, financeiro e nota fiscal." },
+      { name: "author", content: "DistriBev" },
+      { property: "og:title", content: "DistriBev ERP" },
+      { property: "og:description", content: "Sistema completo de gestão para distribuidoras." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -65,5 +66,5 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return <Outlet />;
+  return <AppLayout />;
 }
