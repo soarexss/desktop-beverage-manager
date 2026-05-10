@@ -12,6 +12,6 @@ export default () => ({
     loginThrottleTtl: Number(process.env.LOGIN_THROTTLE_TTL ?? 60),
     loginThrottleLimit: Number(process.env.LOGIN_THROTTLE_LIMIT ?? 5),
     prismaConnectOnStart: process.env.PRISMA_CONNECT_ON_START ?? "true",
-    corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+    corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
   },
 });

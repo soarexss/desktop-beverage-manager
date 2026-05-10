@@ -20,6 +20,8 @@ import { DeliveriesModule } from "./deliveries/deliveries.module";
 import { FinancialModule } from "./financial/financial.module";
 import { InvoicesModule } from "./invoices/invoices.module";
 import { ReportsModule } from "./reports/reports.module";
+import { RegistriesModule } from "./registries/registries.module";
+import { OperationsModule } from "./operations/operations.module";
 
 @Module({
   imports: [
@@ -78,6 +80,8 @@ import { ReportsModule } from "./reports/reports.module";
     FinancialModule,
     InvoicesModule,
     ReportsModule,
+    RegistriesModule,
+    OperationsModule,
   ],
   providers: [
     {

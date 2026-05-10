@@ -11,19 +11,19 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get("movements")
-  @Roles(Role.ADMIN, Role.VENDEDOR)
+  @Roles(Role.ADMIN, Role.VENDEDOR, Role.ESTOQUISTA, Role.COMPRAS)
   list() {
     return this.inventoryService.list();
   }
 
   @Get("stock/:productId")
-  @Roles(Role.ADMIN, Role.VENDEDOR, Role.ENTREGADOR)
+  @Roles(Role.ADMIN, Role.VENDEDOR, Role.ENTREGADOR, Role.ESTOQUISTA, Role.COMPRAS)
   getStock(@Param("productId") productId: string) {
     return this.inventoryService.getStock(productId);
   }
 
   @Post("movements")
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.ESTOQUISTA, Role.COMPRAS)
   createMovement(
     @Body() dto: CreateInventoryMovementDto,
     @CurrentUser() user: AuthenticatedUser,

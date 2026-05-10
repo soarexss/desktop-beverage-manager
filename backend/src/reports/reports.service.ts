@@ -44,20 +44,27 @@ export class ReportsService {
   }
 
   async inventorySummary() {
-    const [products, lowStock] = await Promise.all([
-      this.prisma.product.count(),
-      this.prisma.product.findMany({
-        where: {
-          inventoryMovements: {
-            some: {},
-          },
-        },
-        take: 10,
-      }),
-    ]);
+    const products = await this.prisma.product.findMany({
+      include: {
+        inventoryMovements: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const lowStock = products
+      .map((product) => {
+        const stock = product.inventoryMovements.reduce((sum, movement) => {
+          const quantity = Number(movement.quantity);
+          return sum + (movement.type === "OUTBOUND" ? -quantity : quantity);
+        }, 0);
+
+        return { ...product, currentStock: stock };
+      })
+      .filter((product) => product.currentStock <= product.minStock)
+      .slice(0, 10);
 
     return {
-      products,
+      products: products.length,
       lowStock,
     };
   }

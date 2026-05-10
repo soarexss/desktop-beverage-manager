@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { Role } from "../common/enums/role.enum";
 import { OrdersService } from "../orders/orders.service";
 import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
 import { InvoicesRepository } from "./invoices.repository";
@@ -21,7 +22,7 @@ export class InvoicesService {
     await this.ordersService.findOne(dto.orderId, {
       sub: user.sub,
       email: user.email,
-      role: user.role,
+      role: user.role === Role.ADMIN ? user.role : Role.ADMIN,
     });
 
     const invoice = await this.invoicesRepository.create({

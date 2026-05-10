@@ -10,7 +10,7 @@ import {
 import { FinancialService } from "./financial.service";
 
 @Controller("financial")
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.FINANCEIRO, Role.CAIXA)
 export class FinancialController {
   constructor(private readonly financialService: FinancialService) {}
 

@@ -5,7 +5,7 @@ import { DateRangeReportDto } from "./dto/report.dto";
 import { ReportsService } from "./reports.service";
 
 @Controller("reports")
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.FINANCEIRO, Role.FISCAL, Role.COMPRAS)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

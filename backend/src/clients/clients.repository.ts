@@ -12,6 +12,10 @@ export class ClientsRepository {
     email?: string;
     phone?: string;
     address: string;
+    cityId?: string;
+    activityProfileId?: string;
+    creditLimit?: number;
+    status?: string;
     notes?: string;
     createdById: string;
   }) {

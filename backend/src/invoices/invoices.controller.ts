@@ -7,7 +7,7 @@ import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
 import { InvoicesService } from "./invoices.service";
 
 @Controller("invoices")
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.FISCAL, Role.FINANCEIRO)
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
