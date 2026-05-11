@@ -6,11 +6,14 @@ import {
   CloseCashSessionDto,
   CreateBankAccountDto,
   CreateBankReconciliationDto,
+  CreateBankTransactionDto,
+  CreateCashMovementDto,
   CreateCommissionDto,
   CreatePaymentDto,
   CreatePriceTableDto,
   CreatePurchaseOrderDto,
   OpenCashSessionDto,
+  TransferBetweenBankAccountsDto,
 } from "./dto/operations.dto";
 
 @Injectable()
@@ -238,6 +241,7 @@ export class OperationsService {
       include: {
         openedBy: { select: { id: true, name: true, email: true } },
         closedBy: { select: { id: true, name: true, email: true } },
+        movements: { orderBy: { createdAt: "desc" } },
       },
       orderBy: { openedAt: "desc" },
     });
@@ -288,6 +292,37 @@ export class OperationsService {
     return session;
   }
 
+  async createCashMovement(dto: CreateCashMovementDto, user: AuthenticatedUser) {
+    const session = await this.prisma.cashSession.findUnique({
+      where: { id: dto.cashSessionId },
+    });
+
+    if (!session) {
+      throw new NotFoundException("Cash session not found");
+    }
+
+    if (session.status !== "OPEN") {
+      throw new BadRequestException("Cash session is closed");
+    }
+
+    const movement = await this.prisma.cashMovement.create({
+      data: {
+        ...dto,
+        createdById: user.sub,
+      },
+    });
+
+    await this.auditService.logAction({
+      actorId: user.sub,
+      action: "operations.cash.movement",
+      entityType: "cash_movement",
+      entityId: movement.id,
+      metadata: { type: dto.type, amount: dto.amount },
+    });
+
+    return movement;
+  }
+
   listPayments() {
     return this.prisma.payment.findMany({
       include: {
@@ -333,7 +368,10 @@ export class OperationsService {
 
   listBankAccounts() {
     return this.prisma.bankAccount.findMany({
-      include: { reconciliations: { orderBy: { reconciledAt: "desc" } } },
+      include: {
+        reconciliations: { orderBy: { reconciledAt: "desc" } },
+        transactions: { orderBy: { occurredAt: "desc" }, take: 20 },
+      },
       orderBy: { name: "asc" },
     });
   }
@@ -363,6 +401,64 @@ export class OperationsService {
       });
 
       return reconciliation;
+    });
+  }
+
+  async createBankTransaction(dto: CreateBankTransactionDto) {
+    return this.prisma.$transaction(async (transaction) => {
+      const created = await transaction.bankTransaction.create({
+        data: dto,
+      });
+
+      await transaction.bankAccount.update({
+        where: { id: dto.bankAccountId },
+        data: {
+          balance:
+            dto.type === "CREDIT"
+              ? { increment: dto.amount }
+              : { decrement: dto.amount },
+        },
+      });
+
+      return created;
+    });
+  }
+
+  async transferBetweenBankAccounts(dto: TransferBetweenBankAccountsDto) {
+    return this.prisma.$transaction(async (transaction) => {
+      const description = dto.description ?? "Transferencia entre contas";
+
+      const debit = await transaction.bankTransaction.create({
+        data: {
+          bankAccountId: dto.fromBankAccountId,
+          type: "DEBIT",
+          amount: dto.amount,
+          description,
+          reference: dto.toBankAccountId,
+        },
+      });
+
+      const credit = await transaction.bankTransaction.create({
+        data: {
+          bankAccountId: dto.toBankAccountId,
+          type: "CREDIT",
+          amount: dto.amount,
+          description,
+          reference: dto.fromBankAccountId,
+        },
+      });
+
+      await transaction.bankAccount.update({
+        where: { id: dto.fromBankAccountId },
+        data: { balance: { decrement: dto.amount } },
+      });
+
+      await transaction.bankAccount.update({
+        where: { id: dto.toBankAccountId },
+        data: { balance: { increment: dto.amount } },
+      });
+
+      return { debit, credit };
     });
   }
 

@@ -42,3 +42,64 @@ export class CreateInventoryMovementDto {
   @IsString()
   reason?: string;
 }
+
+export class CreateProductBarcodeDto {
+  @IsUUID()
+  productId!: string;
+
+  @IsString()
+  code!: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string = "EAN";
+
+  @IsOptional()
+  @IsString()
+  source?: string;
+}
+
+export class CreateInventoryCountSessionDto {
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class AddInventoryCountItemDto {
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string;
+
+  @IsNumber()
+  @Min(0)
+  countedQty!: number;
+}
+
+export class CreateInventoryReservationDto {
+  @IsUUID()
+  productId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  orderId?: string;
+
+  @IsNumber()
+  @Min(0.0001)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+}

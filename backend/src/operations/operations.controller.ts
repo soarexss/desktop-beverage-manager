@@ -7,11 +7,14 @@ import {
   CloseCashSessionDto,
   CreateBankAccountDto,
   CreateBankReconciliationDto,
+  CreateBankTransactionDto,
+  CreateCashMovementDto,
   CreateCommissionDto,
   CreatePaymentDto,
   CreatePriceTableDto,
   CreatePurchaseOrderDto,
   OpenCashSessionDto,
+  TransferBetweenBankAccountsDto,
 } from "./dto/operations.dto";
 import { OperationsService } from "./operations.service";
 
@@ -77,6 +80,15 @@ export class OperationsController {
     return this.operationsService.closeCashSession(id, dto, user);
   }
 
+  @Post("cash-movements")
+  @Roles(Role.ADMIN, Role.CAIXA, Role.FINANCEIRO)
+  createCashMovement(
+    @Body() dto: CreateCashMovementDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.operationsService.createCashMovement(dto, user);
+  }
+
   @Get("payments")
   @Roles(Role.ADMIN, Role.CAIXA, Role.FINANCEIRO)
   listPayments() {
@@ -105,6 +117,18 @@ export class OperationsController {
   @Roles(Role.ADMIN, Role.FINANCEIRO)
   reconcileBank(@Body() dto: CreateBankReconciliationDto) {
     return this.operationsService.reconcileBank(dto);
+  }
+
+  @Post("bank-transactions")
+  @Roles(Role.ADMIN, Role.FINANCEIRO)
+  createBankTransaction(@Body() dto: CreateBankTransactionDto) {
+    return this.operationsService.createBankTransaction(dto);
+  }
+
+  @Post("bank-transfers")
+  @Roles(Role.ADMIN, Role.FINANCEIRO)
+  transferBetweenBankAccounts(@Body() dto: TransferBetweenBankAccountsDto) {
+    return this.operationsService.transferBetweenBankAccounts(dto);
   }
 
   @Get("commissions")

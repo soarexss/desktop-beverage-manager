@@ -15,7 +15,7 @@ import { CreateClientDto, UpdateClientDto } from "./dto/client.dto";
 import { ClientsService } from "./clients.service";
 
 @Controller("clients")
-@Roles(Role.ADMIN, Role.VENDEDOR)
+@Roles(Role.ADMIN, Role.VENDEDOR, Role.FINANCEIRO, Role.CAIXA)
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { BankTransactionType, CashMovementType } from "@prisma/client";
 
 export class ProductPriceItemDto {
   @IsUUID()
@@ -190,6 +192,64 @@ export class CreateBankReconciliationDto {
   @IsOptional()
   @IsString()
   externalReference?: string;
+}
+
+export class CreateCashMovementDto {
+  @IsUUID()
+  cashSessionId!: string;
+
+  @IsEnum(CashMovementType)
+  type!: CashMovementType;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  methodName?: string;
+
+  @IsString()
+  description!: string;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+}
+
+export class CreateBankTransactionDto {
+  @IsUUID()
+  bankAccountId!: string;
+
+  @IsEnum(BankTransactionType)
+  type!: BankTransactionType;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsString()
+  description!: string;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+}
+
+export class TransferBetweenBankAccountsDto {
+  @IsUUID()
+  fromBankAccountId!: string;
+
+  @IsUUID()
+  toBankAccountId!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
 
 export class CreateCommissionDto {

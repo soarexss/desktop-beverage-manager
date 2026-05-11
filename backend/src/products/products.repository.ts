@@ -12,12 +12,18 @@ export class ProductsRepository {
 
   findAll() {
     return this.prisma.product.findMany({
+      include: {
+        barcodes: true,
+      },
       orderBy: { createdAt: "desc" },
     });
   }
 
   findById(id: string) {
-    return this.prisma.product.findUnique({ where: { id } });
+    return this.prisma.product.findUnique({
+      where: { id },
+      include: { barcodes: true },
+    });
   }
 
   findByIds(ids: string[]) {

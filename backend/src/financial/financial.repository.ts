@@ -15,6 +15,7 @@ export class FinancialRepository {
       include: {
         client: true,
         order: true,
+        settlements: true,
       },
       orderBy: { dueDate: "asc" },
     });
@@ -34,15 +35,15 @@ export class FinancialRepository {
   summary() {
     return Promise.all([
       this.prisma.financialTransaction.aggregate({
-        where: { type: "RECEIVABLE" },
+        where: { type: "RECEIVABLE", status: { not: "CANCELLED" } },
         _sum: { amount: true },
       }),
       this.prisma.financialTransaction.aggregate({
-        where: { type: "PAYABLE" },
+        where: { type: "PAYABLE", status: { not: "CANCELLED" } },
         _sum: { amount: true },
       }),
       this.prisma.financialTransaction.aggregate({
-        where: { status: "PENDING" },
+        where: { status: { in: ["PENDING", "PARTIAL", "OVERDUE"] } },
         _sum: { amount: true },
       }),
     ]);

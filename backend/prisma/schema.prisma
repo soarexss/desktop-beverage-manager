@@ -47,9 +47,11 @@ enum FinancialType {
 
 enum FinancialStatus {
   PENDING
+  PARTIAL
   PAID
   OVERDUE
   CANCELLED
+  RENEGOTIATED
 }
 
 enum InvoiceStatus {
@@ -103,31 +105,68 @@ enum CommissionStatus {
   CANCELLED
 }
 
+enum InventoryCountStatus {
+  DRAFT
+  COUNTING
+  CLOSED
+  CANCELLED
+}
+
+enum InventoryReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+  CANCELLED
+}
+
+enum CashMovementType {
+  SALE
+  RECEIPT
+  PAYMENT
+  WITHDRAWAL
+  SUPPLY
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum BankTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum BankTransactionStatus {
+  PENDING
+  RECONCILED
+  IGNORED
+}
+
 model User {
-  id                  String                 @id @default(cuid())
-  name                String
-  email               String                 @unique
-  passwordHash        String
-  role                Role
-  isActive            Boolean                @default(true)
-  failedLoginAttempts Int                    @default(0)
-  lockedUntil         DateTime?
-  lastLoginAt         DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  clients             Client[]
-  orders              Order[]
-  deliveries          Delivery[]             @relation("DeliveryPerson")
-  inventoryMovements  InventoryMovement[]
-  financialEntries    FinancialTransaction[]
-  issuedInvoices      Invoice[]
-  openedCashSessions  CashSession[]          @relation("OpenedCashSessions")
-  closedCashSessions  CashSession[]          @relation("ClosedCashSessions")
-  purchaseOrders      PurchaseOrder[]
-  payments            Payment[]
-  commissions         Commission[]
-  refreshTokens       RefreshToken[]
-  auditLogs           AuditLog[]
+  id                   String                 @id @default(cuid())
+  name                 String
+  email                String                 @unique
+  passwordHash         String
+  role                 Role
+  isActive             Boolean                @default(true)
+  failedLoginAttempts  Int                    @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  clients              Client[]
+  orders               Order[]
+  deliveries           Delivery[]             @relation("DeliveryPerson")
+  inventoryMovements   InventoryMovement[]
+  financialEntries     FinancialTransaction[]
+  issuedInvoices       Invoice[]
+  openedCashSessions   CashSession[]          @relation("OpenedCashSessions")
+  closedCashSessions   CashSession[]          @relation("ClosedCashSessions")
+  cashMovements        CashMovement[]
+  purchaseOrders       PurchaseOrder[]
+  payments             Payment[]
+  financialSettlements FinancialSettlement[]
+  commissions          Commission[]
+  refreshTokens        RefreshToken[]
+  auditLogs            AuditLog[]
 
   @@index([role, isActive])
 }
@@ -170,8 +209,8 @@ model Client {
 }
 
 model Product {
-  id                 String              @id @default(cuid())
-  sku                String              @unique
+  id                 String                 @id @default(cuid())
+  sku                String                 @unique
   barcode            String?
   name               String
   description        String?
@@ -183,23 +222,40 @@ model Product {
   ncmId              String?
   cfopId             String?
   taxCategoryId      String?
-  price              Decimal             @db.Decimal(12, 2)
-  cost               Decimal             @db.Decimal(12, 2)
+  price              Decimal                @db.Decimal(12, 2)
+  cost               Decimal                @db.Decimal(12, 2)
   minStock           Int
   maxStock           Int?
-  trackBatch         Boolean             @default(false)
-  isActive           Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  trackBatch         Boolean                @default(false)
+  isActive           Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
   orderItems         OrderItem[]
   inventoryMovements InventoryMovement[]
   purchaseItems      PurchaseOrderItem[]
   prices             ProductPrice[]
+  barcodes           ProductBarcode[]
+  countItems         InventoryCountItem[]
+  reservations       InventoryReservation[]
 
   @@index([name])
   @@index([groupId, subgroupId])
   @@index([brandId, unitId])
   @@index([ncmId, cfopId])
+}
+
+model ProductBarcode {
+  id        String   @id @default(cuid())
+  productId String
+  code      String   @unique
+  type      String   @default("EAN")
+  source    String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([code])
 }
 
 model InventoryMovement {
@@ -218,6 +274,55 @@ model InventoryMovement {
 
   @@index([productId, type])
   @@index([batchNumber, expiresAt])
+}
+
+model InventoryReservation {
+  id          String                     @id @default(cuid())
+  productId   String
+  orderId     String?
+  quantity    Decimal                    @db.Decimal(12, 3)
+  status      InventoryReservationStatus @default(ACTIVE)
+  reason      String?
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  product     Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, status])
+  @@index([orderId])
+}
+
+model InventoryCountSession {
+  id          String               @id @default(cuid())
+  code        String?              @unique
+  status      InventoryCountStatus @default(DRAFT)
+  description String?
+  startedAt   DateTime?
+  closedAt    DateTime?
+  createdById String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  items       InventoryCountItem[]
+
+  @@index([status, createdAt])
+}
+
+model InventoryCountItem {
+  id            String                @id @default(cuid())
+  sessionId     String
+  productId     String
+  barcode       String?
+  expectedQty   Decimal               @default(0) @db.Decimal(12, 3)
+  countedQty    Decimal               @default(0) @db.Decimal(12, 3)
+  differenceQty Decimal               @default(0) @db.Decimal(12, 3)
+  unitCost      Decimal?              @db.Decimal(12, 2)
+  countedAt     DateTime              @default(now())
+  session       InventoryCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product       Product               @relation(fields: [productId], references: [id])
+
+  @@unique([sessionId, productId])
+  @@index([productId])
 }
 
 model Order {
@@ -276,26 +381,67 @@ model Delivery {
 }
 
 model FinancialTransaction {
-  id          String          @id @default(cuid())
-  orderId     String?
-  clientId    String?
-  createdById String
-  type        FinancialType
-  status      FinancialStatus @default(PENDING)
-  amount      Decimal         @db.Decimal(12, 2)
-  description String
-  dueDate     DateTime
-  paidAt      DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  order       Order?          @relation(fields: [orderId], references: [id])
-  client      Client?         @relation(fields: [clientId], references: [id])
-  createdBy   User            @relation(fields: [createdById], references: [id])
-  payments    Payment[]
+  id                String                 @id @default(cuid())
+  orderId           String?
+  clientId          String?
+  createdById       String
+  type              FinancialType
+  status            FinancialStatus        @default(PENDING)
+  amount            Decimal                @db.Decimal(12, 2)
+  originalAmount    Decimal                @default(0) @db.Decimal(12, 2)
+  paidAmount        Decimal                @default(0) @db.Decimal(12, 2)
+  interestAmount    Decimal                @default(0) @db.Decimal(12, 2)
+  penaltyAmount     Decimal                @default(0) @db.Decimal(12, 2)
+  discountAmount    Decimal                @default(0) @db.Decimal(12, 2)
+  description       String
+  documentNumber    String?
+  dueDate           DateTime
+  paidAt            DateTime?
+  supplierId        String?
+  supplierName      String?
+  categoryId        String?
+  costCenterId      String?
+  paymentMethodId   String?
+  paymentMethodName String?
+  installmentNumber Int                    @default(1)
+  totalInstallments Int                    @default(1)
+  parentId          String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  order             Order?                 @relation(fields: [orderId], references: [id])
+  client            Client?                @relation(fields: [clientId], references: [id])
+  createdBy         User                   @relation(fields: [createdById], references: [id])
+  payments          Payment[]
+  settlements       FinancialSettlement[]
+  parent            FinancialTransaction?  @relation("FinancialInstallments", fields: [parentId], references: [id])
+  children          FinancialTransaction[] @relation("FinancialInstallments")
 
   @@index([type, status, dueDate])
   @@index([orderId])
   @@index([clientId])
+  @@index([supplierId])
+  @@index([categoryId])
+  @@index([costCenterId])
+}
+
+model FinancialSettlement {
+  id                     String               @id @default(cuid())
+  financialTransactionId String
+  amount                 Decimal              @db.Decimal(12, 2)
+  interestAmount         Decimal              @default(0) @db.Decimal(12, 2)
+  penaltyAmount          Decimal              @default(0) @db.Decimal(12, 2)
+  discountAmount         Decimal              @default(0) @db.Decimal(12, 2)
+  methodId               String?
+  methodName             String
+  receiptNumber          String?
+  notes                  String?
+  settledAt              DateTime             @default(now())
+  createdById            String
+  financialTransaction   FinancialTransaction @relation(fields: [financialTransactionId], references: [id], onDelete: Cascade)
+  createdBy              User                 @relation(fields: [createdById], references: [id])
+
+  @@index([financialTransactionId])
+  @@index([settledAt])
 }
 
 model Invoice {
@@ -446,8 +592,26 @@ model CashSession {
   notes          String?
   openedBy       User              @relation("OpenedCashSessions", fields: [openedById], references: [id])
   closedBy       User?             @relation("ClosedCashSessions", fields: [closedById], references: [id])
+  movements      CashMovement[]
 
   @@index([status, openedAt])
+}
+
+model CashMovement {
+  id            String           @id @default(cuid())
+  cashSessionId String
+  type          CashMovementType
+  amount        Decimal          @db.Decimal(12, 2)
+  methodName    String?
+  description   String
+  reference     String?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  cashSession   CashSession      @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  createdBy     User             @relation(fields: [createdById], references: [id])
+
+  @@index([cashSessionId, createdAt])
+  @@index([type])
 }
 
 model Payment {
@@ -481,6 +645,22 @@ model BankAccount {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   reconciliations BankReconciliation[]
+  transactions    BankTransaction[]
+}
+
+model BankTransaction {
+  id            String                @id @default(cuid())
+  bankAccountId String
+  type          BankTransactionType
+  status        BankTransactionStatus @default(PENDING)
+  amount        Decimal               @db.Decimal(12, 2)
+  description   String
+  reference     String?
+  occurredAt    DateTime              @default(now())
+  bankAccount   BankAccount           @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([bankAccountId, occurredAt])
+  @@index([status])
 }
 
 model BankReconciliation {
@@ -493,6 +673,31 @@ model BankReconciliation {
   bankAccount       BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
 
   @@index([bankAccountId, reconciledAt])
+}
+
+model ChartAccount {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  name      String
+  type      FinancialType
+  parentId  String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([type, isActive])
+}
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  parentId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 model Commission {
