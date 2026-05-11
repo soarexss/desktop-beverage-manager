@@ -103,6 +103,16 @@ enum CommissionStatus {
   CANCELLED
 }
 
+enum CashMovementType {
+  SALE
+  RECEIPT
+  PAYMENT
+  WITHDRAWAL
+  SUPPLY
+  TRANSFER
+  ADJUSTMENT
+}
+
 model User {
   id                  String                 @id @default(cuid())
   name                String
@@ -123,6 +133,7 @@ model User {
   issuedInvoices      Invoice[]
   openedCashSessions  CashSession[]          @relation("OpenedCashSessions")
   closedCashSessions  CashSession[]          @relation("ClosedCashSessions")
+  cashMovements       CashMovement[]
   purchaseOrders      PurchaseOrder[]
   payments            Payment[]
   commissions         Commission[]
@@ -446,8 +457,26 @@ model CashSession {
   notes          String?
   openedBy       User              @relation("OpenedCashSessions", fields: [openedById], references: [id])
   closedBy       User?             @relation("ClosedCashSessions", fields: [closedById], references: [id])
+  movements      CashMovement[]
 
   @@index([status, openedAt])
+}
+
+model CashMovement {
+  id            String           @id @default(cuid())
+  cashSessionId String
+  type          CashMovementType
+  amount        Decimal          @db.Decimal(12, 2)
+  methodName    String?
+  description   String
+  reference     String?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  cashSession   CashSession      @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  createdBy     User             @relation(fields: [createdById], references: [id])
+
+  @@index([cashSessionId, createdAt])
+  @@index([type])
 }
 
 model Payment {

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,16 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+
+export enum CashMovementTypeDto {
+  SALE = "SALE",
+  RECEIPT = "RECEIPT",
+  PAYMENT = "PAYMENT",
+  WITHDRAWAL = "WITHDRAWAL",
+  SUPPLY = "SUPPLY",
+  TRANSFER = "TRANSFER",
+  ADJUSTMENT = "ADJUSTMENT",
+}
 
 export class ProductPriceItemDto {
   @IsUUID()
@@ -126,6 +137,29 @@ export class CloseCashSessionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class CreateCashMovementDto {
+  @IsString()
+  cashSessionId!: string;
+
+  @IsEnum(CashMovementTypeDto)
+  type!: CashMovementTypeDto;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsString()
+  methodName?: string;
+
+  @IsString()
+  description!: string;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
 }
 
 export class CreatePaymentDto {

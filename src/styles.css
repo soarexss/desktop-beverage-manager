@@ -176,8 +176,8 @@
   html, body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: var(--font-sans);
-    font-size: 13px;
+    font-family: var(--app-font-family, var(--font-sans));
+    font-size: var(--app-font-size, 13px);
     line-height: 1.45;
   }
 

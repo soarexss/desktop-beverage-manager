@@ -1,7 +1,7 @@
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { Logger, ValidationPipe, VersioningType } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { Logger as PinoLogger } from "nestjs-pino";
@@ -18,10 +18,6 @@ async function bootstrap() {
   app.useLogger(logger);
 
   app.enableShutdownHooks();
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: "1",
-  });
   app.setGlobalPrefix("v1");
 
   app.use(
@@ -34,7 +30,10 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: (process.env.CORS_ORIGIN ?? "http://localhost:3000")
+    origin: (
+      process.env.CORS_ORIGIN ??
+      "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000"
+    )
       .split(",")
       .map((origin) => origin.trim()),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],

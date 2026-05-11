@@ -6,6 +6,7 @@ import {
   CloseCashSessionDto,
   CreateBankAccountDto,
   CreateBankReconciliationDto,
+  CreateCashMovementDto,
   CreateCommissionDto,
   CreatePaymentDto,
   CreatePriceTableDto,
@@ -238,6 +239,7 @@ export class OperationsService {
       include: {
         openedBy: { select: { id: true, name: true, email: true } },
         closedBy: { select: { id: true, name: true, email: true } },
+        movements: { orderBy: { createdAt: "desc" } },
       },
       orderBy: { openedAt: "desc" },
     });
@@ -286,6 +288,42 @@ export class OperationsService {
     });
 
     return session;
+  }
+
+  async createCashMovement(dto: CreateCashMovementDto, user: AuthenticatedUser) {
+    const session = await this.prisma.cashSession.findUnique({
+      where: { id: dto.cashSessionId },
+    });
+
+    if (!session) {
+      throw new NotFoundException("Cash session not found");
+    }
+
+    if (session.status !== "OPEN") {
+      throw new BadRequestException("Cash session is closed");
+    }
+
+    const movement = await this.prisma.cashMovement.create({
+      data: {
+        cashSessionId: dto.cashSessionId,
+        type: dto.type,
+        amount: dto.amount,
+        methodName: dto.methodName,
+        description: dto.description,
+        reference: dto.reference,
+        createdById: user.sub,
+      },
+    });
+
+    await this.auditService.logAction({
+      actorId: user.sub,
+      action: "operations.cash.movement",
+      entityType: "cash_movement",
+      entityId: movement.id,
+      metadata: { type: dto.type, amount: dto.amount },
+    });
+
+    return movement;
   }
 
   listPayments() {

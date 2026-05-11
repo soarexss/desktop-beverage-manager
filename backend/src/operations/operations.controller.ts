@@ -7,6 +7,7 @@ import {
   CloseCashSessionDto,
   CreateBankAccountDto,
   CreateBankReconciliationDto,
+  CreateCashMovementDto,
   CreateCommissionDto,
   CreatePaymentDto,
   CreatePriceTableDto,
@@ -75,6 +76,15 @@ export class OperationsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.operationsService.closeCashSession(id, dto, user);
+  }
+
+  @Post("cash-movements")
+  @Roles(Role.ADMIN, Role.CAIXA, Role.FINANCEIRO)
+  createCashMovement(
+    @Body() dto: CreateCashMovementDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.operationsService.createCashMovement(dto, user);
   }
 
   @Get("payments")
