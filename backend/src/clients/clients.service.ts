@@ -2,12 +2,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { AuditService } from "../audit/audit.service";
-import { Role } from "../common/enums/role.enum";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { CreateClientDto, UpdateClientDto } from "./dto/client.dto";
-import { ClientsRepository } from "./clients.repository";
+} from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
+import { Role } from '../common/enums/role.enum';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
+import { ClientsRepository } from './clients.repository';
 
 @Injectable()
 export class ClientsService {
@@ -18,7 +18,9 @@ export class ClientsService {
 
   findAll(user: AuthenticatedUser) {
     return this.clientsRepository.findAll(
-      user.role === Role.ADMIN ? {} : { createdById: user.sub },
+      [Role.ADMIN, Role.CAIXA].includes(user.role)
+        ? {}
+        : { createdById: user.sub },
     );
   }
 
@@ -36,11 +38,10 @@ export class ClientsService {
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "clients.create",
-      entityType: "client",
+      action: 'clients.create',
+      entityType: 'client',
       entityId: client.id,
     });
-
     return client;
   }
 
@@ -49,8 +50,8 @@ export class ClientsService {
     const client = await this.clientsRepository.update(id, { ...dto });
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "clients.update",
-      entityType: "client",
+      action: 'clients.update',
+      entityType: 'client',
       entityId: id,
     });
     return client;
@@ -61,11 +62,11 @@ export class ClientsService {
     await this.clientsRepository.remove(id);
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "clients.delete",
-      entityType: "client",
+      action: 'clients.delete',
+      entityType: 'client',
       entityId: id,
     });
-    return { message: "Client removed" };
+    return { message: 'Client removed' };
   }
 
   async getPurchaseHistory(id: string, user: AuthenticatedUser) {
@@ -73,13 +74,19 @@ export class ClientsService {
     return this.clientsRepository.purchaseHistory(id);
   }
 
-  private ensureOwnership(client: { createdById: string } | null, user: AuthenticatedUser) {
+  private ensureOwnership(
+    client: { createdById: string } | null,
+    user: AuthenticatedUser,
+  ) {
     if (!client) {
-      throw new NotFoundException("Client not found");
+      throw new NotFoundException('Client not found');
     }
 
-    if (user.role !== Role.ADMIN && client.createdById !== user.sub) {
-      throw new ForbiddenException("You do not have access to this client");
+    if (
+      ![Role.ADMIN, Role.CAIXA].includes(user.role) &&
+      client.createdById !== user.sub
+    ) {
+      throw new ForbiddenException('You do not have access to this client');
     }
   }
 }

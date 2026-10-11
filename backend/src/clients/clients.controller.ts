@@ -6,16 +6,16 @@ import {
   Param,
   Patch,
   Post,
-} from "@nestjs/common";
-import { CurrentUser } from "../common/decorators/current-user.decorator";
-import { Roles } from "../common/decorators/roles.decorator";
-import { Role } from "../common/enums/role.enum";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { CreateClientDto, UpdateClientDto } from "./dto/client.dto";
-import { ClientsService } from "./clients.service";
+} from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
+import { ClientsService } from './clients.service';
 
-@Controller("clients")
-@Roles(Role.ADMIN, Role.VENDEDOR)
+@Controller('clients')
+@Roles(Role.ADMIN, Role.VENDEDOR, Role.CAIXA)
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
@@ -24,13 +24,13 @@ export class ClientsController {
     return this.clientsService.findAll(user);
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.clientsService.findOne(id, user);
   }
 
-  @Get(":id/history")
-  history(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+  @Get(':id/history')
+  history(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.clientsService.getPurchaseHistory(id, user);
   }
 
@@ -39,17 +39,17 @@ export class ClientsController {
     return this.clientsService.create(dto, user);
   }
 
-  @Patch(":id")
+  @Patch(':id')
   update(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateClientDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.clientsService.update(id, dto, user);
   }
 
-  @Delete(":id")
-  remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.clientsService.remove(id, user);
   }
 }

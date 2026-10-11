@@ -1,14 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { hash } from "bcrypt";
-import { AuditService } from "../audit/audit.service";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { CreateUserDto, UpdateUserDto } from "./dto/user.dto";
-import { UsersRepository } from "./users.repository";
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { hash } from 'bcrypt';
+import { AuditService } from '../audit/audit.service';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { UsersRepository } from './users.repository';
 
 @Injectable()
 export class UsersService {
@@ -26,7 +27,7 @@ export class UsersService {
     const user = await this.usersRepository.findById(id);
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException('User not found');
     }
 
     return user;
@@ -36,12 +37,12 @@ export class UsersService {
     const existing = await this.usersRepository.findByEmail(dto.email);
 
     if (existing) {
-      throw new ConflictException("Email already in use");
+      throw new ConflictException('Email already in use');
     }
 
     const passwordHash = await hash(
       dto.password,
-      this.configService.getOrThrow<number>("app.bcryptRounds"),
+      this.configService.getOrThrow<number>('app.bcryptRounds'),
     );
 
     const created = await this.usersRepository.create({
@@ -54,8 +55,8 @@ export class UsersService {
 
     await this.auditService.logAction({
       actorId: actor.sub,
-      action: "users.create",
-      entityType: "user",
+      action: 'users.create',
+      entityType: 'user',
       entityId: created.id,
       metadata: { email: created.email, role: created.role },
     });
@@ -65,6 +66,13 @@ export class UsersService {
 
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     await this.findOne(id);
+    if (
+      id === actor.sub &&
+      (dto.isActive === false || (dto.role && dto.role !== actor.role))
+    )
+      throw new BadRequestException(
+        'Outro administrador deve alterar sua ativação ou perfil',
+      );
 
     const data: Record<string, unknown> = {
       name: dto.name,
@@ -76,7 +84,7 @@ export class UsersService {
     if (dto.password) {
       data.passwordHash = await hash(
         dto.password,
-        this.configService.getOrThrow<number>("app.bcryptRounds"),
+        this.configService.getOrThrow<number>('app.bcryptRounds'),
       );
     }
 
@@ -84,8 +92,8 @@ export class UsersService {
 
     await this.auditService.logAction({
       actorId: actor.sub,
-      action: "users.update",
-      entityType: "user",
+      action: 'users.update',
+      entityType: 'user',
       entityId: id,
     });
 
@@ -94,14 +102,18 @@ export class UsersService {
 
   async remove(id: string, actor: AuthenticatedUser) {
     await this.findOne(id);
+    if (id === actor.sub)
+      throw new BadRequestException(
+        'Outro administrador deve desativar sua conta',
+      );
     await this.usersRepository.remove(id);
     await this.auditService.logAction({
       actorId: actor.sub,
-      action: "users.delete",
-      entityType: "user",
+      action: 'users.deactivate',
+      entityType: 'user',
       entityId: id,
     });
 
-    return { message: "User removed" };
+    return { message: 'Usuário desativado; histórico preservado' };
   }
 }

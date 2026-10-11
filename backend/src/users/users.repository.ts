@@ -1,6 +1,8 @@
-import { Injectable } from "@nestjs/common";
-import { Prisma, Role } from "@prisma/client";
-import { PrismaService } from "../database/prisma.service";
+import { BadRequestException } from '@nestjs/common';
+import { serializable } from '../common/transaction';
+import { Injectable } from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class UsersRepository {
@@ -18,7 +20,7 @@ export class UsersRepository {
 
   findAll() {
     return this.prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         name: true,
@@ -64,22 +66,38 @@ export class UsersRepository {
       passwordHash: string;
     }>,
   ) {
-    return this.prisma.user.update({
-      where: { id },
-      data: data as Prisma.UserUncheckedUpdateInput,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true,
-        createdAt: true,
-      },
+    return serializable(this.prisma, async (tx) => {
+      const existing = await tx.user.findUniqueOrThrow({ where: { id } });
+      if (
+        existing.role === 'admin' &&
+        existing.isActive &&
+        (data.isActive === false || (data.role && data.role !== 'admin'))
+      ) {
+        const otherAdmins = await tx.user.count({
+          where: { id: { not: id }, role: 'admin', isActive: true },
+        });
+        if (!otherAdmins)
+          throw new BadRequestException(
+            'Mantenha ao menos um administrador ativo',
+          );
+      }
+      return tx.user.update({
+        where: { id },
+        data: { ...data, sessionVersion: { increment: 1 } },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+      });
     });
   }
 
   remove(id: string) {
-    return this.prisma.user.delete({ where: { id } });
+    return this.update(id, { isActive: false });
   }
 }

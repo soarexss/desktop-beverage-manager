@@ -1,25 +1,19 @@
-import { PartialType } from "@nestjs/swagger";
+import { FinancialStatus as FinancialStatusDto } from '@prisma/client';
+import { FinancialType as FinancialTypeDto } from '@prisma/client';
+import { IsEntityId } from '../../common/dto/entity-id';
+import { PartialType } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
-export enum FinancialTypeDto {
-  RECEIVABLE = "RECEIVABLE",
-  PAYABLE = "PAYABLE",
-}
+export { FinancialTypeDto };
 
-export enum FinancialStatusDto {
-  PENDING = "PENDING",
-  PAID = "PAID",
-  OVERDUE = "OVERDUE",
-  CANCELLED = "CANCELLED",
-}
+export { FinancialStatusDto };
 
 export class CreateFinancialTransactionDto {
   @IsEnum(FinancialTypeDto)
@@ -40,11 +34,11 @@ export class CreateFinancialTransactionDto {
   dueDate!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   clientId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   orderId?: string;
 }
 

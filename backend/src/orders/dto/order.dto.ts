@@ -1,3 +1,6 @@
+import { OrderStatus as OrderStatusDto } from '@prisma/client';
+import { IsUUID, IsIn, ArrayMaxSize } from 'class-validator';
+import { IsEntityId } from '../../common/dto/entity-id';
 import {
   ArrayMinSize,
   IsArray,
@@ -5,22 +8,15 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-export enum OrderStatusDto {
-  DRAFT = "DRAFT",
-  CONFIRMED = "CONFIRMED",
-  DELIVERING = "DELIVERING",
-  COMPLETED = "COMPLETED",
-  CANCELLED = "CANCELLED",
-}
+export { OrderStatusDto };
 
 export class CreateOrderItemDto {
-  @IsUUID()
+  @IsEntityId()
   productId!: string;
 
   @IsNumber()
@@ -30,6 +26,11 @@ export class CreateOrderItemDto {
 
 export class CreateOrderDto {
   @IsUUID()
+  requestId!: string;
+
+  @IsIn(['DINHEIRO', 'PIX', 'CARTAO', 'PRAZO'])
+  paymentMethod!: string;
+  @IsEntityId()
   clientId!: string;
 
   @IsOptional()
@@ -39,6 +40,7 @@ export class CreateOrderDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items!: CreateOrderItemDto[];

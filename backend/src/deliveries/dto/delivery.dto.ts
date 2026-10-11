@@ -1,18 +1,14 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from "class-validator";
+import { DeliveryStatus as DeliveryStatusDto } from '@prisma/client';
+import { IsEntityId } from '../../common/dto/entity-id';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
-export enum DeliveryStatusDto {
-  PENDING = "PENDING",
-  ASSIGNED = "ASSIGNED",
-  IN_ROUTE = "IN_ROUTE",
-  DELIVERED = "DELIVERED",
-  FAILED = "FAILED",
-}
+export { DeliveryStatusDto };
 
 export class AssignDeliveryDto {
-  @IsUUID()
+  @IsEntityId()
   orderId!: string;
 
-  @IsUUID()
+  @IsEntityId()
   deliveryPersonId!: string;
 
   @IsOptional()

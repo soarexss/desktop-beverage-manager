@@ -1,7 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../database/prisma.service";
-import { AuditService } from "../audit/audit.service";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
+import { Role } from '../common/enums/role.enum';
+import { Prisma } from '@prisma/client';
+
+import { serializable } from '../common/transaction';
+
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../database/prisma.service';
+import { AuditService } from '../audit/audit.service';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
 import {
   CloseCashSessionDto,
   CreateBankAccountDto,
@@ -12,7 +22,7 @@ import {
   CreatePriceTableDto,
   CreatePurchaseOrderDto,
   OpenCashSessionDto,
-} from "./dto/operations.dto";
+} from './dto/operations.dto';
 
 @Injectable()
 export class OperationsService {
@@ -32,16 +42,16 @@ export class OperationsService {
       pendingCommissions,
     ] = await Promise.all([
       this.prisma.registryEntry.groupBy({
-        by: ["type"],
+        by: ['type'],
         _count: { _all: true },
       }),
       this.prisma.purchaseOrder.count(),
       this.prisma.priceTable.count({ where: { isActive: true } }),
-      this.prisma.cashSession.count({ where: { status: "OPEN" } }),
+      this.prisma.cashSession.count({ where: { status: 'OPEN' } }),
       this.prisma.payment.aggregate({ _sum: { amount: true } }),
       this.prisma.bankAccount.aggregate({ _sum: { balance: true } }),
       this.prisma.commission.aggregate({
-        where: { status: "PENDING" },
+        where: { status: 'PENDING' },
         _sum: { amount: true },
         _count: { _all: true },
       }),
@@ -68,7 +78,7 @@ export class OperationsService {
           include: { product: true },
         },
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -94,8 +104,8 @@ export class OperationsService {
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.price_table.create",
-      entityType: "price_table",
+      action: 'operations.price_table.create',
+      entityType: 'price_table',
       entityId: table.id,
     });
 
@@ -108,24 +118,51 @@ export class OperationsService {
         createdBy: { select: { id: true, name: true, email: true } },
         items: { include: { product: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async createPurchase(dto: CreatePurchaseOrderDto, user: AuthenticatedUser) {
     const subtotal = dto.items.reduce(
-      (sum, item) => sum + item.quantity * item.unitCost,
-      0,
+      (sum, item) =>
+        sum.plus(
+          new Prisma.Decimal(item.unitCost)
+            .mul(item.quantity)
+            .toDecimalPlaces(2),
+        ),
+      new Prisma.Decimal(0),
     );
     const freightAmount = dto.freightAmount ?? 0;
     const discountAmount = dto.discountAmount ?? 0;
-    const totalAmount = subtotal + freightAmount - discountAmount;
-    const status = dto.receiveNow ? "RECEIVED" : "DRAFT";
+
+    const totalAmount = subtotal
+      .plus(freightAmount)
+      .minus(discountAmount)
+      .toDecimalPlaces(2);
+
+    if (totalAmount.lessThan(0))
+      throw new BadRequestException('Desconto maior que o total da compra');
+
+    const status = dto.receiveNow ? 'RECEIVED' : 'DRAFT';
     const receivedAt = dto.receiveNow ? new Date() : undefined;
 
-    const purchase = await this.prisma.$transaction(async (transaction) => {
+    const purchase = await serializable(this.prisma, async (transaction) => {
+      const existing = await transaction.purchaseOrder.findUnique({
+        where: { requestId: dto.requestId },
+        include: { items: true },
+      });
+
+      if (existing) {
+        if (existing.createdById !== user.sub)
+          throw new BadRequestException('Identificador já utilizado');
+
+        return existing;
+      }
+
       const created = await transaction.purchaseOrder.create({
         data: {
+          requestId: dto.requestId,
+
           supplierId: dto.supplierId,
           supplierName: dto.supplierName,
           invoiceNumber: dto.invoiceNumber,
@@ -142,7 +179,11 @@ export class OperationsService {
               productId: item.productId,
               quantity: item.quantity,
               unitCost: item.unitCost,
-              totalCost: item.quantity * item.unitCost,
+
+              totalCost: new Prisma.Decimal(item.unitCost)
+                .mul(item.quantity)
+                .toDecimalPlaces(2),
+
               batchNumber: item.batchNumber,
               expiresAt: item.expiresAt ? new Date(item.expiresAt) : undefined,
             })),
@@ -157,7 +198,7 @@ export class OperationsService {
             transaction.inventoryMovement.create({
               data: {
                 productId: item.productId,
-                type: "INBOUND",
+                type: 'INBOUND',
                 quantity: item.quantity,
                 unitCost: item.unitCost,
                 batchNumber: item.batchNumber,
@@ -170,40 +211,64 @@ export class OperationsService {
         );
       }
 
+      if (dto.receiveNow && totalAmount.greaterThan(0))
+        await transaction.financialTransaction.create({
+          data: {
+            purchaseOrderId: created.id,
+            type: 'PAYABLE',
+            amount: totalAmount,
+            description: `Compra ${created.id} - ${dto.supplierName}`,
+            dueDate: new Date(),
+            createdById: user.sub,
+          },
+        });
+
       return created;
     });
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.purchase.create",
-      entityType: "purchase_order",
+      action: 'operations.purchase.create',
+      entityType: 'purchase_order',
       entityId: purchase.id,
-      metadata: { totalAmount, status },
+
+      metadata: { totalAmount: totalAmount.toString(), status },
     });
 
     return purchase;
   }
 
   async receivePurchase(id: string, user: AuthenticatedUser) {
-    const purchase = await this.prisma.purchaseOrder.findUnique({
-      where: { id },
-      include: { items: true },
-    });
+    const received = await serializable(this.prisma, async (transaction) => {
+      const purchase = await transaction.purchaseOrder.findUnique({
+        where: { id },
+        include: { items: true },
+      });
 
-    if (!purchase) {
-      throw new NotFoundException("Purchase order not found");
-    }
+      if (!purchase) throw new NotFoundException('Compra não encontrada');
 
-    if (purchase.status === "RECEIVED") {
-      throw new BadRequestException("Purchase order already received");
-    }
+      if (purchase.status === 'RECEIVED') return purchase;
 
-    const received = await this.prisma.$transaction(async (transaction) => {
+      if (purchase.status !== 'DRAFT')
+        throw new BadRequestException('Compra não pode ser recebida');
+
+      if (purchase.totalAmount.greaterThan(0))
+        await transaction.financialTransaction.create({
+          data: {
+            purchaseOrderId: id,
+            type: 'PAYABLE',
+            amount: purchase.totalAmount,
+            description: `Compra ${id} - ${purchase.supplierName}`,
+            dueDate: new Date(),
+            createdById: user.sub,
+          },
+        });
+
       for (const item of purchase.items) {
         await transaction.inventoryMovement.create({
           data: {
             productId: item.productId,
-            type: "INBOUND",
+            type: 'INBOUND',
             quantity: item.quantity,
             unitCost: item.unitCost,
             batchNumber: item.batchNumber,
@@ -217,7 +282,7 @@ export class OperationsService {
       return transaction.purchaseOrder.update({
         where: { id },
         data: {
-          status: "RECEIVED",
+          status: 'RECEIVED',
           receivedAt: new Date(),
         },
         include: { items: true },
@@ -226,8 +291,8 @@ export class OperationsService {
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.purchase.receive",
-      entityType: "purchase_order",
+      action: 'operations.purchase.receive',
+      entityType: 'purchase_order',
       entityId: id,
     });
 
@@ -239,25 +304,34 @@ export class OperationsService {
       include: {
         openedBy: { select: { id: true, name: true, email: true } },
         closedBy: { select: { id: true, name: true, email: true } },
-        movements: { orderBy: { createdAt: "desc" } },
+        movements: { orderBy: { createdAt: 'desc' } },
       },
-      orderBy: { openedAt: "desc" },
+      orderBy: { openedAt: 'desc' },
     });
   }
 
   async openCashSession(dto: OpenCashSessionDto, user: AuthenticatedUser) {
-    const session = await this.prisma.cashSession.create({
-      data: {
-        openedById: user.sub,
-        openingBalance: dto.openingBalance ?? 0,
-        notes: dto.notes,
-      },
+    const session = await serializable(this.prisma, async (tx) => {
+      if (
+        await tx.cashSession.findFirst({
+          where: { openedById: user.sub, status: 'OPEN' },
+        })
+      )
+        throw new BadRequestException('Você já tem um caixa aberto');
+
+      return tx.cashSession.create({
+        data: {
+          openedById: user.sub,
+          openingBalance: dto.openingBalance ?? 0,
+          notes: dto.notes,
+        },
+      });
     });
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.cash.open",
-      entityType: "cash_session",
+      action: 'operations.cash.open',
+      entityType: 'cash_session',
       entityId: session.id,
     });
 
@@ -269,56 +343,94 @@ export class OperationsService {
     dto: CloseCashSessionDto,
     user: AuthenticatedUser,
   ) {
-    const session = await this.prisma.cashSession.update({
-      where: { id },
-      data: {
-        status: "CLOSED",
-        closedById: user.sub,
-        closingBalance: dto.closingBalance,
-        closedAt: new Date(),
-        notes: dto.notes,
-      },
+    const session = await serializable(this.prisma, async (tx) => {
+      const cash = await tx.cashSession.findUnique({
+        where: { id },
+        include: { movements: true },
+      });
+
+      if (!cash || cash.status !== 'OPEN')
+        throw new BadRequestException('Caixa indisponível');
+
+      if (cash.openedById !== user.sub && user.role !== Role.ADMIN)
+        throw new BadRequestException('Caixa de outro operador');
+
+      const expected = cash.movements.reduce(
+        (sum, m) =>
+          ['WITHDRAWAL', 'PAYMENT'].includes(m.type)
+            ? sum.minus(m.amount)
+            : sum.plus(m.amount),
+        cash.openingBalance,
+      );
+
+      if (!expected.equals(new Prisma.Decimal(dto.closingBalance)))
+        throw new BadRequestException(
+          `Saldo esperado: ${expected.toFixed(2)}. Revise os movimentos antes de fechar.`,
+        );
+
+      return tx.cashSession.update({
+        where: { id },
+        data: {
+          status: 'CLOSED',
+          closedById: user.sub,
+          closingBalance: expected,
+          closedAt: new Date(),
+          notes: dto.notes,
+        },
+      });
     });
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.cash.close",
-      entityType: "cash_session",
+      action: 'operations.cash.close',
+      entityType: 'cash_session',
       entityId: id,
     });
 
     return session;
   }
 
-  async createCashMovement(dto: CreateCashMovementDto, user: AuthenticatedUser) {
-    const session = await this.prisma.cashSession.findUnique({
-      where: { id: dto.cashSessionId },
-    });
+  async createCashMovement(
+    dto: CreateCashMovementDto,
+    user: AuthenticatedUser,
+  ) {
+    const movement = await serializable(this.prisma, async (tx) => {
+      const session = await tx.cashSession.findUnique({
+        where: { id: dto.cashSessionId },
+        include: { movements: true },
+      });
 
-    if (!session) {
-      throw new NotFoundException("Cash session not found");
-    }
+      if (!session || session.status !== 'OPEN')
+        throw new BadRequestException('Caixa indisponível');
 
-    if (session.status !== "OPEN") {
-      throw new BadRequestException("Cash session is closed");
-    }
+      if (session.openedById !== user.sub && user.role !== Role.ADMIN)
+        throw new BadRequestException('Caixa de outro operador');
 
-    const movement = await this.prisma.cashMovement.create({
-      data: {
-        cashSessionId: dto.cashSessionId,
-        type: dto.type,
-        amount: dto.amount,
-        methodName: dto.methodName,
-        description: dto.description,
-        reference: dto.reference,
-        createdById: user.sub,
-      },
+      if (['SALE', 'RECEIPT', 'PAYMENT', 'TRANSFER'].includes(dto.type))
+        throw new BadRequestException(
+          'Use a baixa do título para recebimentos/pagamentos; transferências exigem conta de destino',
+        );
+
+      const balance = session.movements.reduce(
+        (sum, m) =>
+          ['WITHDRAWAL', 'PAYMENT'].includes(m.type)
+            ? sum.minus(m.amount)
+            : sum.plus(m.amount),
+        session.openingBalance,
+      );
+
+      if (dto.type === 'WITHDRAWAL' && balance.lessThan(dto.amount))
+        throw new BadRequestException('Saldo de caixa insuficiente');
+
+      return tx.cashMovement.create({
+        data: { ...dto, createdById: user.sub },
+      });
     });
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.cash.movement",
-      entityType: "cash_movement",
+      action: 'operations.cash.movement',
+      entityType: 'cash_movement',
       entityId: movement.id,
       metadata: { type: dto.type, amount: dto.amount },
     });
@@ -332,25 +444,95 @@ export class OperationsService {
         order: { include: { client: true } },
         financialTransaction: true,
       },
-      orderBy: { paidAt: "desc" },
+      orderBy: { paidAt: 'desc' },
     });
   }
 
   async createPayment(dto: CreatePaymentDto, user: AuthenticatedUser) {
-    const payment = await this.prisma.$transaction(async (transaction) => {
+    const payment = await serializable(this.prisma, async (transaction) => {
+      const existing = await transaction.payment.findUnique({
+        where: { requestId: dto.requestId },
+      });
+
+      if (existing) {
+        if (existing.createdById !== user.sub)
+          throw new BadRequestException('Identificador já utilizado');
+
+        return existing;
+      }
+
+      if (!dto.financialTransactionId)
+        throw new BadRequestException('Selecione um título financeiro');
+
+      const title = await transaction.financialTransaction.findUnique({
+        where: { id: dto.financialTransactionId },
+        include: { payments: true, order: true },
+      });
+
+      if (
+        !title ||
+        ['PAID', 'CANCELLED'].includes(title.status) ||
+        title.order?.status === 'CANCELLED'
+      )
+        throw new BadRequestException('Título indisponível');
+
+      if (dto.orderId && dto.orderId !== title.orderId)
+        throw new BadRequestException('Pedido não corresponde ao título');
+
+      const paid = title.payments.reduce(
+        (sum, p) => sum.plus(p.amount),
+        new Prisma.Decimal(0),
+      );
+
+      const amount = new Prisma.Decimal(dto.amount).toDecimalPlaces(2);
+
+      if (
+        amount.lessThanOrEqualTo(0) ||
+        paid.plus(amount).greaterThan(title.amount)
+      )
+        throw new BadRequestException('Valor maior que o saldo ou inválido');
+
       const created = await transaction.payment.create({
+        data: { ...dto, amount, orderId: title.orderId, createdById: user.sub },
+      });
+
+      await transaction.financialTransaction.update({
+        where: { id: title.id },
         data: {
-          ...dto,
-          createdById: user.sub,
+          status: paid.plus(amount).equals(title.amount) ? 'PAID' : 'PENDING',
+          paidAt: paid.plus(amount).equals(title.amount) ? new Date() : null,
         },
       });
 
-      if (dto.financialTransactionId) {
-        await transaction.financialTransaction.update({
-          where: { id: dto.financialTransactionId },
+      if (dto.methodName === 'DINHEIRO') {
+        const cash = await transaction.cashSession.findFirst({
+          where: { openedById: user.sub, status: 'OPEN' },
+          include: { movements: true },
+        });
+
+        if (!cash)
+          throw new BadRequestException('Abra seu caixa para lançar dinheiro');
+
+        const balance = cash.movements.reduce(
+          (sum, m) =>
+            ['WITHDRAWAL', 'PAYMENT'].includes(m.type)
+              ? sum.minus(m.amount)
+              : sum.plus(m.amount),
+          cash.openingBalance,
+        );
+
+        if (title.type === 'PAYABLE' && balance.lessThan(amount))
+          throw new BadRequestException('Saldo de caixa insuficiente');
+
+        await transaction.cashMovement.create({
           data: {
-            status: "PAID",
-            paidAt: new Date(),
+            cashSessionId: cash.id,
+            type: title.type === 'PAYABLE' ? 'PAYMENT' : 'RECEIPT',
+            amount,
+            methodName: dto.methodName,
+            description: title.description,
+            reference: created.id,
+            createdById: user.sub,
           },
         });
       }
@@ -360,8 +542,8 @@ export class OperationsService {
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.payment.create",
-      entityType: "payment",
+      action: 'operations.payment.create',
+      entityType: 'payment',
       entityId: payment.id,
       metadata: { amount: payment.amount, methodName: payment.methodName },
     });
@@ -371,8 +553,8 @@ export class OperationsService {
 
   listBankAccounts() {
     return this.prisma.bankAccount.findMany({
-      include: { reconciliations: { orderBy: { reconciledAt: "desc" } } },
-      orderBy: { name: "asc" },
+      include: { reconciliations: { orderBy: { reconciledAt: 'desc' } } },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -386,7 +568,7 @@ export class OperationsService {
   }
 
   async reconcileBank(dto: CreateBankReconciliationDto) {
-    return this.prisma.$transaction(async (transaction) => {
+    return serializable(this.prisma, async (transaction) => {
       const reconciliation = await transaction.bankReconciliation.create({
         data: dto,
       });
@@ -404,21 +586,25 @@ export class OperationsService {
     });
   }
 
-  listCommissions() {
+  listCommissions(user: AuthenticatedUser) {
     return this.prisma.commission.findMany({
+      where: user.role === Role.VENDEDOR ? { sellerId: user.sub } : {},
+
       include: {
         order: { include: { client: true } },
         seller: { select: { id: true, name: true, email: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async createCommission(dto: CreateCommissionDto, user: AuthenticatedUser) {
-    const order = await this.prisma.order.findUnique({ where: { id: dto.orderId } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+    });
 
     if (!order) {
-      throw new NotFoundException("Order not found");
+      throw new NotFoundException('Order not found');
     }
 
     const baseAmount = Number(order.totalAmount);
@@ -436,8 +622,8 @@ export class OperationsService {
 
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "operations.commission.create",
-      entityType: "commission",
+      action: 'operations.commission.create',
+      entityType: 'commission',
       entityId: commission.id,
       metadata: { orderId: order.id, amount },
     });
@@ -449,7 +635,7 @@ export class OperationsService {
     return this.prisma.commission.update({
       where: { id },
       data: {
-        status: "PAID",
+        status: 'PAID',
         paidAt: new Date(),
       },
     });

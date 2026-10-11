@@ -1,17 +1,23 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { AuditService } from "../audit/audit.service";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { Role } from "../common/enums/role.enum";
-import { OrdersService } from "../orders/orders.service";
-import { CreateInvoiceDto, UpdateInvoiceDto } from "./dto/invoice.dto";
-import { InvoicesRepository } from "./invoices.repository";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+
+import { PrismaService } from '../database/prisma.service';
+import { serializable } from '../common/transaction';
+
+import { CreateInvoiceDto, UpdateInvoiceDto } from './dto/invoice.dto';
+import { InvoicesRepository } from './invoices.repository';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     private readonly invoicesRepository: InvoicesRepository,
-    private readonly ordersService: OrdersService,
-    private readonly auditService: AuditService,
+
+    private readonly prisma: PrismaService,
   ) {}
 
   findAll() {
@@ -19,52 +25,54 @@ export class InvoicesService {
   }
 
   async create(dto: CreateInvoiceDto, user: AuthenticatedUser) {
-    await this.ordersService.findOne(dto.orderId, {
-      sub: user.sub,
-      email: user.email,
-      role: user.role === Role.ADMIN ? user.role : Role.ADMIN,
+    return serializable(this.prisma, async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: dto.orderId } });
+      if (!order || order.status === 'CANCELLED')
+        throw new BadRequestException(
+          'Pedido indisponível para pendência fiscal',
+        );
+      const existing = await tx.invoice.findUnique({
+        where: { orderId: dto.orderId },
+      });
+      if (existing) return existing;
+      const invoice = await tx.invoice.create({
+        data: { ...dto, status: 'PENDING', issuedById: user.sub },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.sub,
+          action: 'invoices.create',
+          entityType: 'invoice',
+          entityId: invoice.id,
+          metadata: { orderId: dto.orderId },
+        },
+      });
+      return invoice;
     });
-
-    const invoice = await this.invoicesRepository.create({
-      orderId: dto.orderId,
-      externalReference: dto.externalReference,
-      xmlContent: dto.xmlContent,
-      status: "PENDING",
-      issuedById: user.sub,
-    });
-
-    await this.auditService.logAction({
-      actorId: user.sub,
-      action: "invoices.create",
-      entityType: "invoice",
-      entityId: invoice.id,
-      metadata: { orderId: dto.orderId },
-    });
-
-    return invoice;
   }
 
   async update(id: string, dto: UpdateInvoiceDto, user: AuthenticatedUser) {
-    const existing = await this.invoicesRepository.findById(id);
-
-    if (!existing) {
-      throw new NotFoundException("Invoice not found");
-    }
-
-    const invoice = await this.invoicesRepository.update(id, {
-      ...dto,
-      processedAt:
-        dto.status && dto.status !== "PENDING" ? new Date() : undefined,
+    return serializable(this.prisma, async (tx) => {
+      const existing = await tx.invoice.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundException('Pendência não encontrada');
+      if (
+        dto.orderId ||
+        existing.status !== 'PENDING' ||
+        (dto.status && dto.status !== 'PENDING')
+      )
+        throw new BadRequestException(
+          'Vínculo é imutável e status fiscal depende de integração autorizada',
+        );
+      const invoice = await tx.invoice.update({ where: { id }, data: dto });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.sub,
+          action: 'invoices.update',
+          entityType: 'invoice',
+          entityId: id,
+        },
+      });
+      return invoice;
     });
-
-    await this.auditService.logAction({
-      actorId: user.sub,
-      action: "invoices.update",
-      entityType: "invoice",
-      entityId: id,
-      metadata: { status: dto.status },
-    });
-
-    return invoice;
   }
 }

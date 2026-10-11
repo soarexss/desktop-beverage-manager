@@ -1,3 +1,4 @@
+import { useAuth } from "@/components/auth-context";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useMemo, useState } from "react";
@@ -45,6 +46,7 @@ type RegistryEntry = {
 
 function Estoque() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({
     sku: "",
@@ -58,7 +60,10 @@ function Estoque() {
     unitId: "",
   });
 
-  const products = useQuery({ queryKey: ["products"], queryFn: () => apiGet<Product[]>("/products") });
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: () => apiGet<Product[]>("/products"),
+  });
   const movements = useQuery({
     queryKey: ["inventory-movements"],
     queryFn: () => apiGet<InventoryMovement[]>("/inventory/movements"),
@@ -82,7 +87,17 @@ function Estoque() {
         trackBatch: true,
       }),
     onSuccess: () => {
-      setForm({ sku: "", barcode: "", name: "", cost: 0, price: 0, minStock: 0, maxStock: 0, groupId: "", unitId: "" });
+      setForm({
+        sku: "",
+        barcode: "",
+        name: "",
+        cost: 0,
+        price: 0,
+        minStock: 0,
+        maxStock: 0,
+        groupId: "",
+        unitId: "",
+      });
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
   });
@@ -92,7 +107,10 @@ function Estoque() {
     for (const movement of movements.data ?? []) {
       const quantity = Number(movement.quantity);
       const current = stock.get(movement.productId) ?? 0;
-      stock.set(movement.productId, current + (movement.type === "OUTBOUND" ? -quantity : quantity));
+      stock.set(
+        movement.productId,
+        current + (movement.type === "OUTBOUND" ? -quantity : quantity),
+      );
     }
     return stock;
   }, [movements.data]);
@@ -103,7 +121,9 @@ function Estoque() {
       if (!normalized) {
         return true;
       }
-      return [product.name, product.sku, product.barcode].some((value) => value?.toLowerCase().includes(normalized));
+      return [product.name, product.sku, product.barcode].some((value) =>
+        value?.toLowerCase().includes(normalized),
+      );
     });
   }, [products.data, search]);
 
@@ -120,28 +140,53 @@ function Estoque() {
       <Panel className="col-span-12" title="Filtros de Pesquisa">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Field label="Codigo / EAN">
-            <input className="erp-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="SKU, EAN ou produto" />
+            <input
+              className="erp-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="SKU, EAN ou produto"
+            />
           </Field>
           <Field label="Grupo">
             <select className="erp-input">
               <option>Todos</option>
-              {(groups.data ?? []).map((group) => <option key={group.id}>{group.name}</option>)}
+              {(groups.data ?? []).map((group) => (
+                <option key={group.id}>{group.name}</option>
+              ))}
             </select>
           </Field>
           <Field label="Status">
-            <select className="erp-input"><option>Todos</option><option>OK</option><option>Estoque baixo</option></select>
+            <select className="erp-input">
+              <option>Todos</option>
+              <option>OK</option>
+              <option>Estoque baixo</option>
+            </select>
           </Field>
           <div className="flex items-end gap-1.5">
-            <button className="erp-btn erp-btn-primary" onClick={() => products.refetch()}><Filter className="h-3.5 w-3.5" />Filtrar</button>
-            <button className="erp-btn" onClick={() => setSearch("")}><RefreshCw className="h-3.5 w-3.5" />Limpar</button>
+            <button className="erp-btn erp-btn-primary" onClick={() => products.refetch()}>
+              <Filter className="h-3.5 w-3.5" />
+              Filtrar
+            </button>
+            <button className="erp-btn" onClick={() => setSearch("")}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Limpar
+            </button>
           </div>
         </div>
       </Panel>
 
       <Panel
         className="col-span-12 lg:col-span-8"
-        title={<span className="flex items-center gap-2"><Package className="h-3.5 w-3.5" /> Produtos cadastrados</span>}
-        actions={<span className="text-[11px] text-muted-foreground">{filteredProducts.length} registros</span>}
+        title={
+          <span className="flex items-center gap-2">
+            <Package className="h-3.5 w-3.5" /> Produtos cadastrados
+          </span>
+        }
+        actions={
+          <span className="text-[11px] text-muted-foreground">
+            {filteredProducts.length} registros
+          </span>
+        }
         bodyClassName="p-0"
       >
         <div className="max-h-[480px] overflow-auto">
@@ -170,7 +215,11 @@ function Estoque() {
                     <td className="text-right tabular-nums font-semibold">{numberPt(stock, 3)}</td>
                     <td className="text-right tabular-nums">{money(product.cost)}</td>
                     <td className="text-right tabular-nums">{money(product.price)}</td>
-                    <td><StatusBadge kind={low ? "danger" : "success"}>{low ? "Baixo" : "OK"}</StatusBadge></td>
+                    <td>
+                      <StatusBadge kind={low ? "danger" : "success"}>
+                        {low ? "Baixo" : "OK"}
+                      </StatusBadge>
+                    </td>
                   </tr>
                 );
               })}
@@ -181,34 +230,110 @@ function Estoque() {
 
       <Panel className="col-span-12 lg:col-span-4" title="Cadastro de produto">
         <form className="space-y-2" onSubmit={submit}>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="SKU"><input className="erp-input" value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} required /></Field>
-            <Field label="EAN"><input className="erp-input" value={form.barcode} onChange={(event) => setForm({ ...form, barcode: event.target.value })} /></Field>
-          </div>
-          <Field label="Descricao"><input className="erp-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Grupo">
-              <select className="erp-input" value={form.groupId} onChange={(event) => setForm({ ...form, groupId: event.target.value })}>
-                <option value="">Selecione</option>
-                {(groups.data ?? []).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-              </select>
+          <fieldset
+            disabled={!["admin", "compras", "estoquista"].includes(user.role)}
+            className="space-y-2 disabled:opacity-60"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="SKU">
+                <input
+                  className="erp-input"
+                  value={form.sku}
+                  onChange={(event) => setForm({ ...form, sku: event.target.value })}
+                  required
+                />
+              </Field>
+              <Field label="EAN">
+                <input
+                  className="erp-input"
+                  value={form.barcode}
+                  onChange={(event) => setForm({ ...form, barcode: event.target.value })}
+                />
+              </Field>
+            </div>
+            <Field label="Descricao">
+              <input
+                className="erp-input"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                required
+              />
             </Field>
-            <Field label="Unidade">
-              <select className="erp-input" value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}>
-                <option value="">Selecione</option>
-                {(units.data ?? []).map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
-              </select>
-            </Field>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Field label="Custo"><input className="erp-input text-right" type="number" step={0.01} value={form.cost} onChange={(event) => setForm({ ...form, cost: Number(event.target.value) })} /></Field>
-            <Field label="Venda"><input className="erp-input text-right" type="number" step={0.01} value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></Field>
-            <Field label="Min."><input className="erp-input text-right" type="number" value={form.minStock} onChange={(event) => setForm({ ...form, minStock: Number(event.target.value) })} /></Field>
-          </div>
-          <button className="erp-btn erp-btn-primary w-full justify-center" disabled={createProduct.isPending}>
-            {createProduct.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Salvar produto
-          </button>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Grupo">
+                <select
+                  className="erp-input"
+                  value={form.groupId}
+                  onChange={(event) => setForm({ ...form, groupId: event.target.value })}
+                >
+                  <option value="">Selecione</option>
+                  {(groups.data ?? []).map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Unidade">
+                <select
+                  className="erp-input"
+                  value={form.unitId}
+                  onChange={(event) => setForm({ ...form, unitId: event.target.value })}
+                >
+                  <option value="">Selecione</option>
+                  {(units.data ?? []).map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Custo">
+                <input
+                  className="erp-input text-right"
+                  type="number"
+                  step={0.01}
+                  value={form.cost}
+                  onChange={(event) => setForm({ ...form, cost: Number(event.target.value) })}
+                />
+              </Field>
+              <Field label="Venda">
+                <input
+                  className="erp-input text-right"
+                  type="number"
+                  step={0.01}
+                  value={form.price}
+                  onChange={(event) => setForm({ ...form, price: Number(event.target.value) })}
+                />
+              </Field>
+              <Field label="Min.">
+                <input
+                  className="erp-input text-right"
+                  type="number"
+                  value={form.minStock}
+                  onChange={(event) => setForm({ ...form, minStock: Number(event.target.value) })}
+                />
+              </Field>
+            </div>
+            <button
+              className="erp-btn erp-btn-primary w-full justify-center"
+              disabled={createProduct.isPending}
+            >
+              {createProduct.isPending ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              Salvar produto
+            </button>
+          </fieldset>
+          {!["admin", "compras", "estoquista"].includes(user.role) && (
+            <p className="text-xs text-muted-foreground">
+              Seu perfil tem acesso de consulta neste cadastro.
+            </p>
+          )}
         </form>
       </Panel>
 
@@ -232,8 +357,11 @@ function Estoque() {
                 <td>{movement.type}</td>
                 <td>{movement.product.name}</td>
                 <td className="font-mono">{movement.batchNumber ?? "-"}</td>
-                <td className={`text-right tabular-nums font-semibold ${movement.type === "OUTBOUND" ? "text-destructive" : "text-success"}`}>
-                  {movement.type === "OUTBOUND" ? "-" : "+"}{numberPt(movement.quantity, 3)}
+                <td
+                  className={`text-right tabular-nums font-semibold ${movement.type === "OUTBOUND" ? "text-destructive" : "text-success"}`}
+                >
+                  {movement.type === "OUTBOUND" ? "-" : "+"}
+                  {numberPt(movement.quantity, 3)}
                 </td>
                 <td className="text-right tabular-nums">{money(movement.unitCost)}</td>
                 <td className="text-muted-foreground">{movement.createdBy.name}</td>

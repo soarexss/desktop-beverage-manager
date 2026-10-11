@@ -1,28 +1,41 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { CurrentUser } from "../common/decorators/current-user.decorator";
-import { Roles } from "../common/decorators/roles.decorator";
-import { Role } from "../common/enums/role.enum";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { CreateInventoryMovementDto } from "./dto/inventory.dto";
-import { InventoryService } from "./inventory.service";
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { CreateInventoryMovementDto } from './dto/inventory.dto';
+import { InventoryService } from './inventory.service';
 
-@Controller("inventory")
+@Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @Get("movements")
-  @Roles(Role.ADMIN, Role.VENDEDOR, Role.ESTOQUISTA, Role.COMPRAS)
+  @Get('movements')
+  @Roles(
+    Role.ADMIN,
+    Role.VENDEDOR,
+    Role.FINANCEIRO,
+    Role.FISCAL,
+    Role.ESTOQUISTA,
+    Role.COMPRAS,
+  )
   list() {
     return this.inventoryService.list();
   }
 
-  @Get("stock/:productId")
-  @Roles(Role.ADMIN, Role.VENDEDOR, Role.ENTREGADOR, Role.ESTOQUISTA, Role.COMPRAS)
-  getStock(@Param("productId") productId: string) {
+  @Get('stock/:productId')
+  @Roles(
+    Role.ADMIN,
+    Role.VENDEDOR,
+    Role.ENTREGADOR,
+    Role.ESTOQUISTA,
+    Role.COMPRAS,
+  )
+  getStock(@Param('productId') productId: string) {
     return this.inventoryService.getStock(productId);
   }
 
-  @Post("movements")
+  @Post('movements')
   @Roles(Role.ADMIN, Role.ESTOQUISTA, Role.COMPRAS)
   createMovement(
     @Body() dto: CreateInventoryMovementDto,

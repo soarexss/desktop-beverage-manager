@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
-import { PrismaService } from "../database/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class InvoicesRepository {
@@ -12,8 +12,8 @@ export class InvoicesRepository {
 
   findAll() {
     return this.prisma.invoice.findMany({
-      include: { order: true },
-      orderBy: { createdAt: "desc" },
+      include: { order: { include: { client: true } } },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

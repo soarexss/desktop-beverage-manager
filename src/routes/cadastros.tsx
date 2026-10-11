@@ -1,3 +1,4 @@
+import { useAuth } from "@/components/auth-context";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useMemo, useState } from "react";
@@ -57,14 +58,32 @@ const registryGroups = [
     title: "Estabelecimento e fiscal",
     icon: Building2,
     description: "Empresa, filial, operacoes, impostos, NCM, CFOP e funcoes fiscais.",
-    types: ["ESTABLISHMENT", "OPERATION_NATURE", "TAX_CATEGORY", "TAX_RULE", "ICMS_ISS_CALC_FUNCTION", "NCM_CODE", "CFOP_CODE"],
+    types: [
+      "ESTABLISHMENT",
+      "OPERATION_NATURE",
+      "TAX_CATEGORY",
+      "TAX_RULE",
+      "ICMS_ISS_CALC_FUNCTION",
+      "NCM_CODE",
+      "CFOP_CODE",
+    ],
   },
   {
     id: "produtos",
     title: "Produtos e classificacao",
     icon: Package,
-    description: "Marcas, unidades, secoes, grupos, subgrupos, complementos, projetos e plataformas.",
-    types: ["BRAND", "UNIT", "SECTION", "PRODUCT_GROUP", "PRODUCT_SUBGROUP", "COMPLEMENT_SUBSTANCE", "PROJECT", "PLATFORM"],
+    description:
+      "Marcas, unidades, secoes, grupos, subgrupos, complementos, projetos e plataformas.",
+    types: [
+      "BRAND",
+      "UNIT",
+      "SECTION",
+      "PRODUCT_GROUP",
+      "PRODUCT_SUBGROUP",
+      "COMPLEMENT_SUBSTANCE",
+      "PROJECT",
+      "PLATFORM",
+    ],
   },
   {
     id: "comercial",
@@ -83,12 +102,42 @@ const registryGroups = [
 ];
 
 const operationalCards = [
-  { title: "Produtos", text: "Cadastro de produto, balanco, tabela de preco, kits, NCM e integracoes.", to: "/estoque", icon: Package },
-  { title: "Clientes", text: "Cadastro completo, cadastro reduzido, agenda, cidades, perfil e credito.", to: "/clientes", icon: Users },
-  { title: "Compras", text: "Entradas, fornecedores, associacao produto-fornecedor e devolucao.", to: "/compras", icon: ClipboardList },
-  { title: "Financeiro", text: "Formas, condicoes, caixa, bancos, boletos, cheques e centro de custo.", to: "/financeiro", icon: WalletCards },
-  { title: "Fiscal", text: "Natureza da operacao, CFOP, NCM, NF-e, SPED, Sintegra e MDF-e.", to: "/notas", icon: Landmark },
-  { title: "Relatorios", text: "Relatorios gerais, financeiros, estoque, fiscal e exportacoes.", to: "/relatorios", icon: BadgePercent },
+  {
+    title: "Produtos",
+    text: "Cadastro de produto, balanco, tabela de preco, kits, NCM e integracoes.",
+    to: "/estoque",
+    icon: Package,
+  },
+  {
+    title: "Clientes",
+    text: "Cadastro completo, cadastro reduzido, agenda, cidades, perfil e credito.",
+    to: "/clientes",
+    icon: Users,
+  },
+  {
+    title: "Compras",
+    text: "Entradas, fornecedores, associacao produto-fornecedor e devolucao.",
+    to: "/compras",
+    icon: ClipboardList,
+  },
+  {
+    title: "Financeiro",
+    text: "Formas, condicoes, caixa, bancos, boletos, cheques e centro de custo.",
+    to: "/financeiro",
+    icon: WalletCards,
+  },
+  {
+    title: "Fiscal",
+    text: "Natureza da operacao, CFOP, NCM, NF-e, SPED, Sintegra e MDF-e.",
+    to: "/notas",
+    icon: Landmark,
+  },
+  {
+    title: "Relatorios",
+    text: "Relatorios gerais, financeiros, estoque, fiscal e exportacoes.",
+    to: "/relatorios",
+    icon: BadgePercent,
+  },
 ];
 
 type RegistryEntry = {
@@ -109,6 +158,7 @@ type RegistrySummary = {
 
 function Cadastros() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [type, setType] = useState("SUPPLIER");
   const [activeGroup, setActiveGroup] = useState("comercial");
   const [search, setSearch] = useState("");
@@ -143,15 +193,21 @@ function Cadastros() {
     },
   });
 
-  const countByType = useMemo(() => new Map((summary.data ?? []).map((item) => [item.type, item.count])), [summary.data]);
-  const selectedGroup = registryGroups.find((group) => group.id === activeGroup) ?? registryGroups[0];
+  const countByType = useMemo(
+    () => new Map((summary.data ?? []).map((item) => [item.type, item.count])),
+    [summary.data],
+  );
+  const selectedGroup =
+    registryGroups.find((group) => group.id === activeGroup) ?? registryGroups[0];
   const filteredEntries = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     return (entries.data ?? []).filter((entry) => {
       if (!normalized) {
         return true;
       }
-      return [entry.code, entry.name, entry.description].some((value) => value?.toLowerCase().includes(normalized));
+      return [entry.code, entry.name, entry.description].some((value) =>
+        value?.toLowerCase().includes(normalized),
+      );
     });
   }, [entries.data, search]);
 
@@ -179,13 +235,25 @@ function Cadastros() {
     <div className="grid grid-cols-12 gap-3">
       <Panel
         className="col-span-12"
-        title={<span className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Central de cadastros do ERP</span>}
-        actions={<button className="erp-btn" onClick={() => summary.refetch()}><RefreshCw className="h-3.5 w-3.5" />Atualizar</button>}
+        title={
+          <span className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" /> Central de cadastros do ERP
+          </span>
+        }
+        actions={
+          <button className="erp-btn" onClick={() => summary.refetch()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Atualizar
+          </button>
+        }
       >
         <div className="grid gap-3 md:grid-cols-4">
           {registryGroups.map((group) => {
             const Icon = group.icon;
-            const count = group.types.reduce((sum, itemType) => sum + (countByType.get(itemType) ?? 0), 0);
+            const count = group.types.reduce(
+              (sum, itemType) => sum + (countByType.get(itemType) ?? 0),
+              0,
+            );
             return (
               <button
                 key={group.id}
@@ -217,13 +285,18 @@ function Cadastros() {
               onClick={() => setType(itemType)}
             >
               <span>{registryLabels[itemType]}</span>
-              <span className="rounded bg-muted px-1.5 text-[11px] tabular-nums">{countByType.get(itemType) ?? 0}</span>
+              <span className="rounded bg-muted px-1.5 text-[11px] tabular-nums">
+                {countByType.get(itemType) ?? 0}
+              </span>
             </button>
           ))}
         </div>
       </Panel>
 
-      <Panel className="col-span-12 xl:col-span-5" title={`Cadastro ativo - ${registryLabels[type]}`}>
+      <Panel
+        className="col-span-12 xl:col-span-5"
+        title={`Cadastro ativo - ${registryLabels[type]}`}
+      >
         <div className="mb-3 grid grid-cols-3 gap-2">
           <div className="rounded border bg-muted/30 p-2">
             <div className="text-[11px] uppercase text-muted-foreground">Registros</div>
@@ -239,28 +312,62 @@ function Cadastros() {
           </div>
         </div>
         <form className="space-y-2" onSubmit={submit}>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Tipo">
-              <select className="erp-input" value={type} onChange={(event) => setType(event.target.value)}>
-                {Object.entries(registryLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
+          <fieldset disabled={user.role !== "admin"} className="space-y-2 disabled:opacity-60">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Tipo">
+                <select
+                  className="erp-input"
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
+                >
+                  {Object.entries(registryLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Codigo">
+                <input
+                  className="erp-input"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="Ex: 5102, AMB, CX12"
+                />
+              </Field>
+            </div>
+            <Field label="Nome">
+              <input
+                className="erp-input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+              />
             </Field>
-            <Field label="Codigo">
-              <input className="erp-input" value={code} onChange={(event) => setCode(event.target.value)} placeholder="Ex: 5102, AMB, CX12" />
+            <Field label="Descricao">
+              <textarea
+                className="erp-input min-h-20"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </Field>
-          </div>
-          <Field label="Nome">
-            <input className="erp-input" value={name} onChange={(event) => setName(event.target.value)} required />
-          </Field>
-          <Field label="Descricao">
-            <textarea className="erp-input min-h-20" value={description} onChange={(event) => setDescription(event.target.value)} />
-          </Field>
-          <button className="erp-btn erp-btn-primary w-full justify-center" disabled={createEntry.isPending}>
-            {createEntry.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Salvar cadastro
-          </button>
+            <button
+              className="erp-btn erp-btn-primary w-full justify-center"
+              disabled={createEntry.isPending}
+            >
+              {createEntry.isPending ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              Salvar cadastro
+            </button>
+          </fieldset>
+          {user.role !== "admin" && (
+            <p className="text-xs text-muted-foreground">
+              Seu perfil tem acesso de consulta neste cadastro.
+            </p>
+          )}
         </form>
       </Panel>
 
@@ -269,8 +376,15 @@ function Cadastros() {
           {operationalCards.map((card) => {
             const Icon = card.icon;
             return (
-              <Link key={card.title} to={card.to} className="rounded border bg-card p-2 hover:bg-muted">
-                <div className="flex items-center gap-2 font-semibold"><Icon className="h-3.5 w-3.5 text-info" />{card.title}</div>
+              <Link
+                key={card.title}
+                to={card.to}
+                className="rounded border bg-card p-2 hover:bg-muted"
+              >
+                <div className="flex items-center gap-2 font-semibold">
+                  <Icon className="h-3.5 w-3.5 text-info" />
+                  {card.title}
+                </div>
                 <div className="mt-1 text-[11.5px] text-muted-foreground">{card.text}</div>
               </Link>
             );
@@ -281,20 +395,53 @@ function Cadastros() {
       <Panel
         className="col-span-12"
         title={registryLabels[type]}
-        actions={<span className="text-[11px] text-muted-foreground">{filteredEntries.length} registros</span>}
+        actions={
+          <span className="text-[11px] text-muted-foreground">
+            {filteredEntries.length} registros
+          </span>
+        }
       >
         <div className="mb-2 grid gap-2 md:grid-cols-5">
           <Field label="Pesquisar">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input className="erp-input pl-7" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Codigo, nome ou descricao" />
+              <input
+                className="erp-input pl-7"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Codigo, nome ou descricao"
+              />
             </div>
           </Field>
-          <Field label="Status"><select className="erp-input"><option>Ativos</option><option>Todos</option><option>Inativos</option></select></Field>
-          <Field label="Modulo"><select className="erp-input" value={activeGroup} onChange={(event) => selectGroup(event.target.value)}>{registryGroups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select></Field>
+          <Field label="Status">
+            <select className="erp-input">
+              <option>Ativos</option>
+              <option>Todos</option>
+              <option>Inativos</option>
+            </select>
+          </Field>
+          <Field label="Modulo">
+            <select
+              className="erp-input"
+              value={activeGroup}
+              onChange={(event) => selectGroup(event.target.value)}
+            >
+              {registryGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.title}
+                </option>
+              ))}
+            </select>
+          </Field>
           <div className="flex items-end gap-1.5">
-            <button className="erp-btn erp-btn-primary" onClick={() => entries.refetch()}><Filter className="h-3.5 w-3.5" />Filtrar</button>
-            <button className="erp-btn" onClick={() => setSearch("")}><RefreshCw className="h-3.5 w-3.5" />Limpar</button>
+            <button className="erp-btn erp-btn-primary" onClick={() => entries.refetch()}>
+              <Filter className="h-3.5 w-3.5" />
+              Filtrar
+            </button>
+            <button className="erp-btn" onClick={() => setSearch("")}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Limpar
+            </button>
           </div>
         </div>
         <div className="max-h-[340px] overflow-auto">
@@ -315,7 +462,11 @@ function Cadastros() {
                   <td className="font-semibold">{entry.name}</td>
                   <td className="text-muted-foreground">{entry.description ?? "-"}</td>
                   <td>{datePt(entry.createdAt)}</td>
-                  <td><StatusBadge kind={entry.isActive ? "success" : "muted"}>{entry.isActive ? "Ativo" : "Inativo"}</StatusBadge></td>
+                  <td>
+                    <StatusBadge kind={entry.isActive ? "success" : "muted"}>
+                      {entry.isActive ? "Ativo" : "Inativo"}
+                    </StatusBadge>
+                  </td>
                 </tr>
               ))}
               {!entries.isLoading && !filteredEntries.length && (
@@ -332,10 +483,26 @@ function Cadastros() {
 
       <Panel className="col-span-12" title="Cobertura planejada dos cadastros">
         <div className="grid gap-2 text-[12.5px] md:grid-cols-4">
-          <Coverage icon={Building2} title="Estabelecimento" text="Empresa, filial, natureza das operacoes, categorias de impostos e regras fiscais." />
-          <Coverage icon={Layers3} title="Produtos" text="Marcas, unidades, secoes, grupos, subgrupos, funcoes ICMS/ISS, complementos, projetos e plataformas." />
-          <Coverage icon={Users} title="Clientes" text="Ramo/perfil, clientes, agenda, cidades, cadastro reduzido e credito comercial." />
-          <Coverage icon={MapPin} title="Movimentacoes" text="CFOP, fretes, transportadoras, veiculos, entradas, saidas, reservas, comissoes e entregas." />
+          <Coverage
+            icon={Building2}
+            title="Estabelecimento"
+            text="Empresa, filial, natureza das operacoes, categorias de impostos e regras fiscais."
+          />
+          <Coverage
+            icon={Layers3}
+            title="Produtos"
+            text="Marcas, unidades, secoes, grupos, subgrupos, funcoes ICMS/ISS, complementos, projetos e plataformas."
+          />
+          <Coverage
+            icon={Users}
+            title="Clientes"
+            text="Ramo/perfil, clientes, agenda, cidades, cadastro reduzido e credito comercial."
+          />
+          <Coverage
+            icon={MapPin}
+            title="Movimentacoes"
+            text="CFOP, fretes, transportadoras, veiculos, entradas, saidas, reservas, comissoes e entregas."
+          />
         </div>
       </Panel>
     </div>

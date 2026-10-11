@@ -1,13 +1,13 @@
-import { PartialType } from "@nestjs/swagger";
+import { IsEntityId } from '../../common/dto/entity-id';
+import { PartialType } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
 export class CreateClientDto {
   @IsString()
@@ -32,11 +32,11 @@ export class CreateClientDto {
   address!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   cityId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   activityProfileId?: string;
 
   @IsOptional()
@@ -46,7 +46,7 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsString()
-  status?: string = "ACTIVE";
+  status?: string = 'ACTIVE';
 
   @IsOptional()
   @IsString()
@@ -57,6 +57,6 @@ export class UpdateClientDto extends PartialType(CreateClientDto) {}
 
 export class ClientPurchaseHistoryQueryDto {
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   sellerId?: string;
 }

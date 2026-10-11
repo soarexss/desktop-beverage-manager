@@ -1,28 +1,24 @@
+import { InventoryMovementType as InventoryMovementTypeDto } from '@prisma/client';
+import { IsEntityId } from '../../common/dto/entity-id';
 import {
   IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
-} from "class-validator";
+} from 'class-validator';
 
-export enum InventoryMovementTypeDto {
-  INBOUND = "INBOUND",
-  OUTBOUND = "OUTBOUND",
-  ADJUSTMENT = "ADJUSTMENT",
-}
+export { InventoryMovementTypeDto };
 
 export class CreateInventoryMovementDto {
-  @IsUUID()
+  @IsEntityId()
   productId!: string;
 
   @IsEnum(InventoryMovementTypeDto)
   type!: InventoryMovementTypeDto;
 
   @IsNumber()
-  @Min(0.0001)
   quantity!: number;
 
   @IsOptional()

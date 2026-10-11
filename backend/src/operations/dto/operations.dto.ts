@@ -1,3 +1,6 @@
+import { CashMovementType as CashMovementTypeDto } from '@prisma/client';
+import { IsUUID, ArrayMaxSize, Max } from 'class-validator';
+import { IsEntityId } from '../../common/dto/entity-id';
 import {
   ArrayMinSize,
   IsArray,
@@ -7,24 +10,15 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Min,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-export enum CashMovementTypeDto {
-  SALE = "SALE",
-  RECEIPT = "RECEIPT",
-  PAYMENT = "PAYMENT",
-  WITHDRAWAL = "WITHDRAWAL",
-  SUPPLY = "SUPPLY",
-  TRANSFER = "TRANSFER",
-  ADJUSTMENT = "ADJUSTMENT",
-}
+export { CashMovementTypeDto };
 
 export class ProductPriceItemDto {
-  @IsUUID()
+  @IsEntityId()
   productId!: string;
 
   @IsNumber()
@@ -61,7 +55,7 @@ export class CreatePriceTableDto {
 }
 
 export class PurchaseOrderItemDto {
-  @IsUUID()
+  @IsEntityId()
   productId!: string;
 
   @IsNumber()
@@ -82,8 +76,10 @@ export class PurchaseOrderItemDto {
 }
 
 export class CreatePurchaseOrderDto {
-  @IsOptional()
   @IsUUID()
+  requestId!: string;
+  @IsOptional()
+  @IsEntityId()
   supplierId?: string;
 
   @IsString()
@@ -113,6 +109,7 @@ export class CreatePurchaseOrderDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => PurchaseOrderItemDto)
   items!: PurchaseOrderItemDto[];
@@ -163,16 +160,18 @@ export class CreateCashMovementDto {
 }
 
 export class CreatePaymentDto {
-  @IsOptional()
   @IsUUID()
+  requestId!: string;
+  @IsOptional()
+  @IsEntityId()
   orderId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   financialTransactionId?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   methodId?: string;
 
   @IsString()
@@ -212,7 +211,7 @@ export class CreateBankAccountDto {
 }
 
 export class CreateBankReconciliationDto {
-  @IsUUID()
+  @IsEntityId()
   bankAccountId!: string;
 
   @IsNumber()
@@ -227,14 +226,15 @@ export class CreateBankReconciliationDto {
 }
 
 export class CreateCommissionDto {
-  @IsUUID()
+  @IsEntityId()
   orderId!: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsEntityId()
   sellerId?: string;
 
   @IsNumber()
   @Min(0)
+  @Max(100)
   percentage!: number;
 }

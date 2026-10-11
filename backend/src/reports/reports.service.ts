@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../database/prisma.service";
-import { DateRangeReportDto } from "./dto/report.dto";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service';
+import { DateRangeReportDto } from './dto/report.dto';
 
 @Injectable()
 export class ReportsService {
@@ -11,23 +11,25 @@ export class ReportsService {
 
     const [orders, receivables, topProducts] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { createdAt },
+        where: { createdAt, status: { not: 'CANCELLED' } },
         _sum: { totalAmount: true, discountAmount: true },
         _count: { _all: true },
       }),
       this.prisma.financialTransaction.aggregate({
         where: {
-          type: "RECEIVABLE",
+          type: 'RECEIVABLE',
+          status: { not: 'CANCELLED' },
           createdAt,
         },
         _sum: { amount: true },
       }),
       this.prisma.orderItem.groupBy({
-        by: ["productId"],
+        by: ['productId'],
+        where: { order: { createdAt, status: { not: 'CANCELLED' } } },
         _sum: { quantity: true, totalPrice: true },
         orderBy: {
           _sum: {
-            totalPrice: "desc",
+            totalPrice: 'desc',
           },
         },
         take: 5,
@@ -48,14 +50,14 @@ export class ReportsService {
       include: {
         inventoryMovements: true,
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
 
     const lowStock = products
       .map((product) => {
         const stock = product.inventoryMovements.reduce((sum, movement) => {
           const quantity = Number(movement.quantity);
-          return sum + (movement.type === "OUTBOUND" ? -quantity : quantity);
+          return sum + (movement.type === 'OUTBOUND' ? -quantity : quantity);
         }, 0);
 
         return { ...product, currentStock: stock };
@@ -75,8 +77,20 @@ export class ReportsService {
     }
 
     return {
-      gte: filters.startDate ? new Date(filters.startDate) : undefined,
-      lte: filters.endDate ? new Date(filters.endDate) : undefined,
+      gte: filters.startDate
+        ? new Date(
+            filters.startDate.length === 10
+              ? `${filters.startDate}T00:00:00-03:00`
+              : filters.startDate,
+          )
+        : undefined,
+      lte: filters.endDate
+        ? new Date(
+            filters.endDate.length === 10
+              ? `${filters.endDate}T23:59:59.999-03:00`
+              : filters.endDate,
+          )
+        : undefined,
     };
   }
 }

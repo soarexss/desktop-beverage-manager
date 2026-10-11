@@ -1,7 +1,20 @@
+import { useAuth } from "@/components/auth-context";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useMemo, useState } from "react";
-import { Banknote, CheckCircle2, Download, Landmark, Plus, RefreshCw, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+
+import {
+  Banknote,
+  CheckCircle2,
+  Download,
+  Landmark,
+  Plus,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+
 import { Panel, StatusBadge, Field } from "@/components/erp";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { datePt, dateTimePt, money } from "@/lib/format";
@@ -19,6 +32,9 @@ type FinancialTransaction = {
   type: "RECEIVABLE" | "PAYABLE";
   status: "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
   amount: string | number;
+
+  payments?: Array<{ amount: string | number }>;
+
   description: string;
   dueDate: string;
   client?: { tradeName: string } | null;
@@ -41,7 +57,7 @@ type CashSession = {
   closingBalance?: string | number | null;
   openedAt: string;
   closedAt?: string | null;
-  openedBy: { name: string };
+  openedBy: { id: string; name: string };
   movements?: CashMovement[];
 };
 
@@ -83,23 +99,56 @@ function cashSessionBalance(session: CashSession) {
 
 function Financeiro() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
   const [openingBalance, setOpeningBalance] = useState(0);
   const [cashMovementForm, setCashMovementForm] = useState({
     cashSessionId: "",
-    type: "RECEIPT" as CashMovement["type"],
+
+    type: "SUPPLY" as CashMovement["type"],
+
     amount: 0,
     methodName: "Dinheiro",
     description: "",
     reference: "",
   });
 
-  const summary = useQuery({ queryKey: ["financial", "summary"], queryFn: () => apiGet<FinancialSummary>("/financial/summary") });
-  const transactions = useQuery({ queryKey: ["financial", "transactions"], queryFn: () => apiGet<FinancialTransaction[]>("/financial/transactions") });
-  const cashSessions = useQuery({ queryKey: ["operations", "cash"], queryFn: () => apiGet<CashSession[]>("/operations/cash-sessions") });
-  const bankAccounts = useQuery({ queryKey: ["operations", "banks"], queryFn: () => apiGet<BankAccount[]>("/operations/bank-accounts") });
-  const commissions = useQuery({ queryKey: ["operations", "commissions"], queryFn: () => apiGet<Commission[]>("/operations/commissions") });
+  const summary = useQuery({
+    queryKey: ["financial", "summary"],
+    queryFn: () => apiGet<FinancialSummary>("/financial/summary"),
+  });
 
-  const openCashSessions = useMemo(() => (cashSessions.data ?? []).filter((session) => session.status === "OPEN"), [cashSessions.data]);
+  const transactions = useQuery({
+    queryKey: ["financial", "transactions"],
+    queryFn: () => apiGet<FinancialTransaction[]>("/financial/transactions"),
+  });
+
+  const cashSessions = useQuery({
+    queryKey: ["operations", "cash"],
+    queryFn: () => apiGet<CashSession[]>("/operations/cash-sessions"),
+  });
+
+  const bankAccounts = useQuery({
+    enabled: user.role !== "caixa",
+    queryKey: ["operations", "banks"],
+    queryFn: () => apiGet<BankAccount[]>("/operations/bank-accounts"),
+  });
+
+  const commissions = useQuery({
+    enabled: user.role !== "caixa",
+    queryKey: ["operations", "commissions"],
+    queryFn: () => apiGet<Commission[]>("/operations/commissions"),
+  });
+
+  const openCashSessions = useMemo(
+    () =>
+      (cashSessions.data ?? []).filter(
+        (session) =>
+          session.status === "OPEN" && (user.role === "admin" || session.openedBy.id === user.id),
+      ),
+    [cashSessions.data, user.role, user.id],
+  );
+
   const activeCashSession = useMemo(() => {
     const id = cashMovementForm.cashSessionId || openCashSessions[0]?.id;
     return openCashSessions.find((session) => session.id === id);
@@ -111,7 +160,11 @@ function Financeiro() {
   };
 
   const openCash = useMutation({
-    mutationFn: () => apiPost<CashSession>("/operations/cash-sessions", { openingBalance, notes: "Abertura pelo financeiro" }),
+    mutationFn: () =>
+      apiPost<CashSession>("/operations/cash-sessions", {
+        openingBalance,
+        notes: "Abertura pelo financeiro",
+      }),
     onSuccess: () => {
       setOpeningBalance(0);
       invalidateOperations();
@@ -126,7 +179,15 @@ function Financeiro() {
         reference: cashMovementForm.reference || undefined,
       }),
     onSuccess: () => {
-      setCashMovementForm({ cashSessionId: "", type: "RECEIPT", amount: 0, methodName: "Dinheiro", description: "", reference: "" });
+      setCashMovementForm({
+        cashSessionId: "",
+        type: "SUPPLY",
+        amount: 0,
+        methodName: "Dinheiro",
+        description: "",
+        reference: "",
+      });
+
       invalidateOperations();
     },
   });
@@ -140,12 +201,72 @@ function Financeiro() {
     onSuccess: () => invalidateOperations(),
   });
 
+  const [paymentForm, setPaymentForm] = useState({
+    financialTransactionId: "",
+    methodName: "PIX",
+    amount: 0,
+    externalReference: "",
+  });
+
+  const [paymentRequestId, setPaymentRequestId] = useState(() => crypto.randomUUID());
+
+  const [titleForm, setTitleForm] = useState({
+    type: "PAYABLE",
+    description: "",
+    amount: 0,
+    dueDate: new Date().toISOString().slice(0, 10),
+  });
+
+  const remaining = (row: FinancialTransaction) =>
+    row.status === "CANCELLED"
+      ? 0
+      : Number(row.amount) - (row.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const payment = useMutation({
+    mutationFn: () =>
+      apiPost("/operations/payments", {
+        ...paymentForm,
+        requestId: paymentRequestId,
+        externalReference: paymentForm.externalReference || undefined,
+      }),
+    onSuccess: () => {
+      setPaymentRequestId(crypto.randomUUID());
+      setPaymentForm({
+        financialTransactionId: "",
+        methodName: "PIX",
+        amount: 0,
+        externalReference: "",
+      });
+      invalidateOperations();
+    },
+  });
+
+  const createTitle = useMutation({
+    mutationFn: () => apiPost("/financial/transactions", titleForm),
+    onSuccess: () => {
+      setTitleForm({ ...titleForm, description: "", amount: 0 });
+      invalidateOperations();
+    },
+  });
+
   const cards = [
     ["A Receber", money(summary.data?.totalReceivables), "info", TrendingUp],
     ["A Pagar", money(summary.data?.totalPayables), "warning", TrendingDown],
     ["Pendente", money(summary.data?.pendingBalance), "danger", TrendingDown],
-    ["Bancos", money((bankAccounts.data ?? []).reduce((sum, account) => sum + Number(account.balance), 0)), "success", Landmark],
-    ["Caixa aberto", money(openCashSessions.reduce((sum, session) => sum + cashSessionBalance(session), 0)), "info", Wallet],
+
+    [
+      "Bancos",
+      money((bankAccounts.data ?? []).reduce((sum, account) => sum + Number(account.balance), 0)),
+      "success",
+      Landmark,
+    ],
+
+    [
+      "Caixa aberto",
+      money(openCashSessions.reduce((sum, session) => sum + cashSessionBalance(session), 0)),
+      "info",
+      Wallet,
+    ],
   ] as const;
   const iconClasses: Record<string, string> = {
     info: "text-info",
@@ -161,7 +282,12 @@ function Financeiro() {
 
   function submitCashMovement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!activeCashSession || cashMovementForm.amount <= 0 || !cashMovementForm.description.trim()) {
+
+    if (
+      !activeCashSession ||
+      cashMovementForm.amount <= 0 ||
+      !cashMovementForm.description.trim()
+    ) {
       return;
     }
     createCashMovement.mutate();
@@ -169,11 +295,156 @@ function Financeiro() {
 
   return (
     <div className="grid grid-cols-12 gap-3">
+      <Panel
+        className="col-span-12 lg:col-span-6"
+        title="Registrar recebimento / pagamento conferido"
+      >
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            payment.mutate();
+          }}
+        >
+          <p className="text-xs text-muted-foreground">
+            Confirme no banco ou terminal antes de registrar. O QR Code não confirma recebimento.
+          </p>
+
+          <Field label="Título em aberto">
+            <select
+              className="erp-input"
+              required
+              value={paymentForm.financialTransactionId}
+              onChange={(e) => {
+                const row = transactions.data?.find((item) => item.id === e.target.value);
+                setPaymentForm({
+                  ...paymentForm,
+                  financialTransactionId: e.target.value,
+                  amount: row ? remaining(row) : 0,
+                });
+              }}
+            >
+              <option value="">Selecione</option>
+              {(transactions.data ?? [])
+                .filter((row) => ["PENDING", "OVERDUE"].includes(row.status))
+                .map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.type === "PAYABLE" ? "Pagar" : "Receber"}: {row.description} - saldo{" "}
+                    {money(remaining(row))}
+                  </option>
+                ))}
+            </select>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Valor conferido">
+              <input
+                type="number"
+                required
+                min="0.01"
+                step="0.01"
+                className="erp-input"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+              />
+            </Field>
+            <Field label="Forma">
+              <select
+                className="erp-input"
+                value={paymentForm.methodName}
+                onChange={(e) => setPaymentForm({ ...paymentForm, methodName: e.target.value })}
+              >
+                <option>PIX</option>
+                <option>DINHEIRO</option>
+                <option>CARTAO</option>
+                <option>TRANSFERENCIA</option>
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Referência do comprovante">
+            <input
+              className="erp-input"
+              value={paymentForm.externalReference}
+              onChange={(e) =>
+                setPaymentForm({ ...paymentForm, externalReference: e.target.value })
+              }
+            />
+          </Field>
+
+          <button
+            className="erp-btn erp-btn-primary"
+            disabled={payment.isPending || !paymentForm.financialTransactionId}
+          >
+            Confirmar lançamento
+          </button>
+        </form>
+      </Panel>
+
+      <Panel className="col-span-12 lg:col-span-6" title="Novo título avulso">
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createTitle.mutate();
+          }}
+        >
+          <Field label="Tipo">
+            <select
+              className="erp-input"
+              value={titleForm.type}
+              onChange={(e) => setTitleForm({ ...titleForm, type: e.target.value })}
+            >
+              <option value="PAYABLE">Conta a pagar</option>
+              <option value="RECEIVABLE">Conta a receber</option>
+            </select>
+          </Field>
+
+          <Field label="Descrição">
+            <input
+              className="erp-input"
+              required
+              value={titleForm.description}
+              onChange={(e) => setTitleForm({ ...titleForm, description: e.target.value })}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Valor">
+              <input
+                className="erp-input"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={titleForm.amount}
+                onChange={(e) => setTitleForm({ ...titleForm, amount: Number(e.target.value) })}
+              />
+            </Field>
+            <Field label="Vencimento">
+              <input
+                className="erp-input"
+                type="date"
+                required
+                value={titleForm.dueDate}
+                onChange={(e) => setTitleForm({ ...titleForm, dueDate: e.target.value })}
+              />
+            </Field>
+          </div>
+          <button className="erp-btn erp-btn-primary" disabled={createTitle.isPending}>
+            Criar título
+          </button>
+        </form>
+      </Panel>
+
       <div className="col-span-12 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map(([label, value, kind, Icon]) => (
           <div key={label} className="erp-panel flex items-center justify-between p-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</div>
+              <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                {label}
+              </div>
+
               <div className="mt-1 text-xl font-bold tabular-nums">{value}</div>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded bg-muted">
@@ -187,55 +458,156 @@ function Financeiro() {
         <div className="grid gap-3 lg:grid-cols-7">
           <form className="space-y-2 lg:col-span-2" onSubmit={submitOpenCash}>
             <Field label="Saldo inicial">
-              <input className="erp-input text-right" type="number" step={0.01} value={openingBalance} onChange={(event) => setOpeningBalance(Number(event.target.value))} />
+              <input
+                className="erp-input text-right"
+                type="number"
+                step={0.01}
+                value={openingBalance}
+                onChange={(event) => setOpeningBalance(Number(event.target.value))}
+              />
             </Field>
-            <button className="erp-btn erp-btn-primary w-full justify-center" disabled={openCash.isPending}><Banknote className="h-3.5 w-3.5" />Abrir caixa</button>
+
+            <button
+              className="erp-btn erp-btn-primary w-full justify-center"
+              disabled={openCash.isPending}
+            >
+              <Banknote className="h-3.5 w-3.5" />
+              Abrir caixa
+            </button>
           </form>
 
           <form className="grid gap-2 lg:col-span-5 lg:grid-cols-5" onSubmit={submitCashMovement}>
             <Field label="Sessao">
-              <select className="erp-input" value={activeCashSession?.id ?? ""} onChange={(event) => setCashMovementForm({ ...cashMovementForm, cashSessionId: event.target.value })}>
-                {openCashSessions.map((session) => <option key={session.id} value={session.id}>{dateTimePt(session.openedAt)} - {session.openedBy.name}</option>)}
+              <select
+                className="erp-input"
+                value={activeCashSession?.id ?? ""}
+                onChange={(event) =>
+                  setCashMovementForm({ ...cashMovementForm, cashSessionId: event.target.value })
+                }
+              >
+                {openCashSessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {dateTimePt(session.openedAt)} - {session.openedBy.name}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Tipo">
-              <select className="erp-input" value={cashMovementForm.type} onChange={(event) => setCashMovementForm({ ...cashMovementForm, type: event.target.value as CashMovement["type"] })}>
-                {Object.entries(cashMovementLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              <select
+                className="erp-input"
+                value={cashMovementForm.type}
+                onChange={(event) =>
+                  setCashMovementForm({
+                    ...cashMovementForm,
+                    type: event.target.value as CashMovement["type"],
+                  })
+                }
+              >
+                {Object.entries(cashMovementLabels)
+                  .filter(([type]) => ["WITHDRAWAL", "SUPPLY", "ADJUSTMENT"].includes(type))
+                  .map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
               </select>
             </Field>
             <Field label="Valor">
-              <input className="erp-input text-right" type="number" step={0.01} value={cashMovementForm.amount} onChange={(event) => setCashMovementForm({ ...cashMovementForm, amount: Number(event.target.value) })} />
+              <input
+                className="erp-input text-right"
+                type="number"
+                step={0.01}
+                value={cashMovementForm.amount}
+                onChange={(event) =>
+                  setCashMovementForm({ ...cashMovementForm, amount: Number(event.target.value) })
+                }
+              />
             </Field>
             <Field label="Forma">
-              <input className="erp-input" value={cashMovementForm.methodName} onChange={(event) => setCashMovementForm({ ...cashMovementForm, methodName: event.target.value })} />
+              <input
+                className="erp-input"
+                value={cashMovementForm.methodName}
+                onChange={(event) =>
+                  setCashMovementForm({ ...cashMovementForm, methodName: event.target.value })
+                }
+              />
             </Field>
             <Field label="Referencia">
-              <input className="erp-input" value={cashMovementForm.reference} onChange={(event) => setCashMovementForm({ ...cashMovementForm, reference: event.target.value })} />
+              <input
+                className="erp-input"
+                value={cashMovementForm.reference}
+                onChange={(event) =>
+                  setCashMovementForm({ ...cashMovementForm, reference: event.target.value })
+                }
+              />
             </Field>
             <div className="lg:col-span-4">
               <Field label="Descricao">
-                <input className="erp-input" value={cashMovementForm.description} onChange={(event) => setCashMovementForm({ ...cashMovementForm, description: event.target.value })} />
+                <input
+                  className="erp-input"
+                  value={cashMovementForm.description}
+                  onChange={(event) =>
+                    setCashMovementForm({ ...cashMovementForm, description: event.target.value })
+                  }
+                />
               </Field>
             </div>
             <div className="flex items-end gap-1.5">
-              <button className="erp-btn flex-1 justify-center" disabled={!activeCashSession || createCashMovement.isPending}><Plus className="h-3.5 w-3.5" />Lancar</button>
-              <button type="button" className="erp-btn erp-btn-primary" disabled={!activeCashSession || closeCash.isPending} onClick={() => activeCashSession && closeCash.mutate(activeCashSession)}>
-                <CheckCircle2 className="h-3.5 w-3.5" />Fechar
+              <button
+                className="erp-btn flex-1 justify-center"
+                disabled={!activeCashSession || createCashMovement.isPending}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Lancar
+              </button>
+
+              <button
+                type="button"
+                className="erp-btn erp-btn-primary"
+                disabled={!activeCashSession || closeCash.isPending}
+                onClick={() => activeCashSession && closeCash.mutate(activeCashSession)}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Fechar
               </button>
             </div>
           </form>
         </div>
         <div className="mt-3 max-h-[260px] overflow-auto">
           <table className="erp-table">
-            <thead><tr><th>Operador</th><th>Abertura</th><th className="text-right">Saldo atual</th><th>Status</th><th>Ultimo movimento</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Operador</th>
+                <th>Abertura</th>
+                <th className="text-right">Saldo atual</th>
+                <th>Status</th>
+                <th>Ultimo movimento</th>
+              </tr>
+            </thead>
+
             <tbody>
               {(cashSessions.data ?? []).slice(0, 8).map((session) => (
                 <tr key={session.id}>
                   <td>{session.openedBy.name}</td>
                   <td>{dateTimePt(session.openedAt)}</td>
-                  <td className="text-right tabular-nums font-semibold">{money(session.status === "OPEN" ? cashSessionBalance(session) : session.closingBalance)}</td>
-                  <td><StatusBadge kind={session.status === "OPEN" ? "success" : "muted"}>{session.status}</StatusBadge></td>
-                  <td className="text-muted-foreground">{session.movements?.[0]?.description ?? "-"}</td>
+
+                  <td className="text-right tabular-nums font-semibold">
+                    {money(
+                      session.status === "OPEN"
+                        ? cashSessionBalance(session)
+                        : session.closingBalance,
+                    )}
+                  </td>
+
+                  <td>
+                    <StatusBadge kind={session.status === "OPEN" ? "success" : "muted"}>
+                      {session.status}
+                    </StatusBadge>
+                  </td>
+
+                  <td className="text-muted-foreground">
+                    {session.movements?.[0]?.description ?? "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -243,61 +615,131 @@ function Financeiro() {
         </div>
       </Panel>
 
-      <Panel className="col-span-12 xl:col-span-5" title="Movimentos recentes do caixa" bodyClassName="p-0">
+      <Panel
+        className="col-span-12 xl:col-span-5"
+        title="Movimentos recentes do caixa"
+        bodyClassName="p-0"
+      >
         <table className="erp-table">
-          <thead><tr><th>Data</th><th>Tipo</th><th>Descricao</th><th className="text-right">Valor</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Descricao</th>
+              <th className="text-right">Valor</th>
+            </tr>
+          </thead>
+
           <tbody>
-            {(cashSessions.data ?? []).flatMap((session) => session.movements ?? []).slice(0, 12).map((movement) => (
-              <tr key={movement.id}>
-                <td>{dateTimePt(movement.createdAt)}</td>
-                <td>{cashMovementLabels[movement.type]}</td>
-                <td>{movement.description}</td>
-                <td className={`text-right font-semibold tabular-nums ${movement.type === "WITHDRAWAL" || movement.type === "PAYMENT" ? "text-destructive" : "text-success"}`}>{money(movement.amount)}</td>
-              </tr>
-            ))}
+            {(cashSessions.data ?? [])
+              .flatMap((session) => session.movements ?? [])
+              .slice(0, 12)
+              .map((movement) => (
+                <tr key={movement.id}>
+                  <td>{dateTimePt(movement.createdAt)}</td>
+                  <td>{cashMovementLabels[movement.type]}</td>
+                  <td>{movement.description}</td>
+
+                  <td
+                    className={`text-right font-semibold tabular-nums ${movement.type === "WITHDRAWAL" || movement.type === "PAYMENT" ? "text-destructive" : "text-success"}`}
+                  >
+                    {money(movement.amount)}
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </Panel>
 
-      <Panel className="col-span-12 lg:col-span-6" title="Contas a pagar" actions={<button className="erp-btn"><Plus className="h-3.5 w-3.5" />Lancar</button>} bodyClassName="p-0">
+      <Panel className="col-span-12 lg:col-span-6" title="Contas a pagar" bodyClassName="p-0">
         <table className="erp-table">
-          <thead><tr><th>Descricao</th><th>Vencimento</th><th className="text-right">Valor</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Descricao</th>
+              <th>Vencimento</th>
+              <th className="text-right">Valor</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
           <tbody>
-            {(transactions.data ?? []).filter((row) => row.type === "PAYABLE").map((row) => (
-              <tr key={row.id}>
-                <td>{row.description}</td>
-                <td>{datePt(row.dueDate)}</td>
-                <td className="text-right font-semibold tabular-nums">{money(row.amount)}</td>
-                <td><StatusBadge kind={row.status === "PAID" ? "success" : "warning"}>{row.status}</StatusBadge></td>
-              </tr>
-            ))}
+            {(transactions.data ?? [])
+              .filter((row) => row.type === "PAYABLE")
+              .map((row) => (
+                <tr key={row.id}>
+                  <td>{row.description}</td>
+                  <td>{datePt(row.dueDate)}</td>
+                  <td className="text-right font-semibold tabular-nums">
+                    {money(row.amount)}
+                    <div className="text-xs text-muted-foreground">
+                      Saldo: {money(remaining(row))}
+                    </div>
+                  </td>
+
+                  <td>
+                    <StatusBadge kind={row.status === "PAID" ? "success" : "warning"}>
+                      {row.status}
+                    </StatusBadge>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </Panel>
 
-      <Panel className="col-span-12 lg:col-span-6" title="Contas a receber" actions={<button className="erp-btn"><Download className="h-3.5 w-3.5" />Exportar</button>} bodyClassName="p-0">
+      <Panel className="col-span-12 lg:col-span-6" title="Contas a receber" bodyClassName="p-0">
         <table className="erp-table">
-          <thead><tr><th>Cliente/Descricao</th><th>Vencimento</th><th className="text-right">Valor</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Cliente/Descricao</th>
+              <th>Vencimento</th>
+              <th className="text-right">Valor</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
           <tbody>
-            {(transactions.data ?? []).filter((row) => row.type === "RECEIVABLE").map((row) => (
-              <tr key={row.id}>
-                <td>{row.client?.tradeName ?? row.description}</td>
-                <td>{datePt(row.dueDate)}</td>
-                <td className="text-right font-semibold tabular-nums">{money(row.amount)}</td>
-                <td><StatusBadge kind={row.status === "PAID" ? "success" : "info"}>{row.status}</StatusBadge></td>
-              </tr>
-            ))}
+            {(transactions.data ?? [])
+              .filter((row) => row.type === "RECEIVABLE")
+              .map((row) => (
+                <tr key={row.id}>
+                  <td>{row.client?.tradeName ?? row.description}</td>
+                  <td>{datePt(row.dueDate)}</td>
+                  <td className="text-right font-semibold tabular-nums">
+                    {money(row.amount)}
+                    <div className="text-xs text-muted-foreground">
+                      Saldo: {money(remaining(row))}
+                    </div>
+                  </td>
+
+                  <td>
+                    <StatusBadge kind={row.status === "PAID" ? "success" : "info"}>
+                      {row.status}
+                    </StatusBadge>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </Panel>
 
       <Panel className="col-span-12 lg:col-span-4" title="Bancos" bodyClassName="p-0">
         <table className="erp-table">
-          <thead><tr><th>Conta</th><th className="text-right">Saldo</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Conta</th>
+              <th className="text-right">Saldo</th>
+            </tr>
+          </thead>
+
           <tbody>
             {(bankAccounts.data ?? []).map((account) => (
               <tr key={account.id}>
-                <td><div className="font-semibold">{account.name}</div><div className="text-[11px] text-muted-foreground">{account.bankName}</div></td>
+                <td>
+                  <div className="font-semibold">{account.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{account.bankName}</div>
+                </td>
+
                 <td className="text-right font-semibold tabular-nums">{money(account.balance)}</td>
               </tr>
             ))}
@@ -307,14 +749,30 @@ function Financeiro() {
 
       <Panel className="col-span-12 lg:col-span-8" title="Comissoes" bodyClassName="p-0">
         <table className="erp-table">
-          <thead><tr><th>Vendedor</th><th>Cliente</th><th className="text-right">Valor</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Vendedor</th>
+              <th>Cliente</th>
+              <th className="text-right">Valor</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
           <tbody>
             {(commissions.data ?? []).slice(0, 6).map((commission) => (
               <tr key={commission.id}>
                 <td>{commission.seller.name}</td>
                 <td>{commission.order.client.tradeName}</td>
-                <td className="text-right font-semibold tabular-nums">{money(commission.amount)}</td>
-                <td><StatusBadge kind={commission.status === "PAID" ? "success" : "warning"}>{commission.status}</StatusBadge></td>
+
+                <td className="text-right font-semibold tabular-nums">
+                  {money(commission.amount)}
+                </td>
+
+                <td>
+                  <StatusBadge kind={commission.status === "PAID" ? "success" : "warning"}>
+                    {commission.status}
+                  </StatusBadge>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -120,6 +120,7 @@ model User {
   passwordHash        String
   role                Role
   isActive            Boolean                @default(true)
+  sessionVersion      Int                    @default(0)
   failedLoginAttempts Int                    @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
@@ -232,6 +233,7 @@ model InventoryMovement {
 }
 
 model Order {
+  requestId             String?                @unique
   id                    String                 @id @default(cuid())
   clientId              String
   sellerId              String
@@ -287,6 +289,8 @@ model Delivery {
 }
 
 model FinancialTransaction {
+  purchaseOrderId String? @unique
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   id          String          @id @default(cuid())
   orderId     String?
   clientId    String?
@@ -408,6 +412,8 @@ model ProductPrice {
 }
 
 model PurchaseOrder {
+  requestId      String?             @unique
+  financialTransaction FinancialTransaction?
   id             String              @id @default(cuid())
   supplierId     String?
   supplierName   String
@@ -480,6 +486,7 @@ model CashMovement {
 }
 
 model Payment {
+  requestId              String?               @unique
   id                     String                @id @default(cuid())
   orderId                String?
   financialTransactionId String?

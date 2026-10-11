@@ -35,7 +35,11 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "DistriBev ERP — Gestão de Distribuidora de Bebidas" },
-      { name: "description", content: "Sistema ERP completo para distribuidoras de bebidas: estoque, PDV, clientes, entregas, financeiro e nota fiscal." },
+      {
+        name: "description",
+        content:
+          "Sistema ERP completo para distribuidoras de bebidas: estoque, PDV, clientes, entregas, financeiro e nota fiscal.",
+      },
       { name: "author", content: "DistriBev" },
       { property: "og:title", content: "DistriBev ERP" },
       { property: "og:description", content: "Sistema completo de gestão para distribuidoras." },
@@ -57,7 +61,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>

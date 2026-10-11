@@ -1,17 +1,14 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { JwtService } from "@nestjs/jwt";
-import { compare, hash } from "bcrypt";
-import { add } from "date-fns";
-import { AuditService } from "../audit/audit.service";
-import { Role } from "../common/enums/role.enum";
-import { AuthenticatedUser } from "../common/interfaces/authenticated-user.interface";
-import { AuthRepository } from "./auth.repository";
-import { LoginDto, RefreshTokenDto } from "./dto/auth.dto";
+import { createHash, randomUUID } from 'node:crypto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { compare } from 'bcrypt';
+import { add } from 'date-fns';
+import { AuditService } from '../audit/audit.service';
+import { Role } from '../common/enums/role.enum';
+import { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { AuthRepository } from './auth.repository';
+import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -26,11 +23,11 @@ export class AuthService {
     const user = await this.authRepository.findUserByEmail(dto.email);
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new UnauthorizedException("Account locked due to failed attempts");
+      throw new UnauthorizedException('Account locked due to failed attempts');
     }
 
     const passwordMatches = await compare(dto.password, user.passwordHash);
@@ -45,13 +42,13 @@ export class AuthService {
 
       await this.auditService.logAction({
         actorId: user.id,
-        action: "auth.login.failed",
-        entityType: "user",
+        action: 'auth.login.failed',
+        entityType: 'user',
         entityId: user.id,
         metadata: { email: dto.email },
       });
 
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     await this.authRepository.updateLoginState(user.id, {
@@ -64,21 +61,31 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role as Role,
+      sessionVersion: user.sessionVersion,
     };
 
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.getOrThrow<string>("app.jwtSecret"),
-      expiresIn: this.configService.getOrThrow<string>("app.jwtExpiresIn") as never,
-    });
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.getOrThrow<string>("app.jwtRefreshSecret"),
-      expiresIn: this.configService.getOrThrow<string>("app.jwtRefreshExpiresIn") as never,
-    });
-
-    const refreshTokenHash = await hash(
-      refreshToken,
-      this.configService.getOrThrow<number>("app.bcryptRounds"),
+    const accessToken = await this.jwtService.signAsync(
+      { ...payload, jti: randomUUID() },
+      {
+        secret: this.configService.getOrThrow<string>('app.jwtSecret'),
+        expiresIn: this.configService.getOrThrow<string>(
+          'app.jwtExpiresIn',
+        ) as never,
+      },
     );
+    const refreshToken = await this.jwtService.signAsync(
+      { ...payload, jti: randomUUID() },
+      {
+        secret: this.configService.getOrThrow<string>('app.jwtRefreshSecret'),
+        expiresIn: this.configService.getOrThrow<string>(
+          'app.jwtRefreshExpiresIn',
+        ) as never,
+      },
+    );
+
+    const refreshTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
     await this.authRepository.revokeAllRefreshTokens(user.id);
     await this.authRepository.createRefreshToken({
@@ -89,8 +96,8 @@ export class AuthService {
 
     await this.auditService.logAction({
       actorId: user.id,
-      action: "auth.login.success",
-      entityType: "user",
+      action: 'auth.login.success',
+      entityType: 'user',
       entityId: user.id,
     });
 
@@ -111,7 +118,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(
         dto.refreshToken,
         {
-          secret: this.configService.getOrThrow<string>("app.jwtRefreshSecret"),
+          secret: this.configService.getOrThrow<string>('app.jwtRefreshSecret'),
         },
       );
 
@@ -120,49 +127,70 @@ export class AuthService {
       );
 
       if (!storedToken || storedToken.expiresAt < new Date()) {
-        throw new UnauthorizedException("Refresh token expired");
+        throw new UnauthorizedException('Refresh token expired');
       }
 
-      const tokenMatches = await compare(dto.refreshToken, storedToken.tokenHash);
+      const user = await this.authRepository.findUserByEmail(payload.email);
+      if (!user?.isActive || user.sessionVersion !== payload.sessionVersion)
+        throw new UnauthorizedException();
+      const tokenMatches =
+        createHash('sha256').update(dto.refreshToken).digest('hex') ===
+        storedToken.tokenHash;
 
       if (!tokenMatches) {
-        throw new UnauthorizedException("Invalid refresh token");
+        throw new UnauthorizedException('Invalid refresh token');
       }
 
-      await this.authRepository.revokeRefreshToken(storedToken.id);
+      if (!(await this.authRepository.consumeRefreshToken(storedToken.id)))
+        throw new UnauthorizedException();
 
-      return this.loginWithPayload(payload);
+      return this.loginWithPayload({
+        sub: user.id,
+        email: user.email,
+        role: user.role as Role,
+        sessionVersion: user.sessionVersion,
+      });
     } catch {
-      throw new UnauthorizedException("Invalid refresh token");
+      throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
   async logout(user: AuthenticatedUser) {
+    await this.authRepository.invalidateSessions(user.sub);
     await this.authRepository.revokeAllRefreshTokens(user.sub);
     await this.auditService.logAction({
       actorId: user.sub,
-      action: "auth.logout",
-      entityType: "user",
+      action: 'auth.logout',
+      entityType: 'user',
       entityId: user.sub,
     });
 
-    return { message: "Session closed" };
+    return { message: 'Session closed' };
   }
 
   private async loginWithPayload(payload: AuthenticatedUser) {
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.getOrThrow<string>("app.jwtSecret"),
-      expiresIn: this.configService.getOrThrow<string>("app.jwtExpiresIn") as never,
-    });
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.getOrThrow<string>("app.jwtRefreshSecret"),
-      expiresIn: this.configService.getOrThrow<string>("app.jwtRefreshExpiresIn") as never,
-    });
-
-    const refreshTokenHash = await hash(
-      refreshToken,
-      this.configService.getOrThrow<number>("app.bcryptRounds"),
+    const accessToken = await this.jwtService.signAsync(
+      { ...payload, jti: randomUUID() },
+      {
+        secret: this.configService.getOrThrow<string>('app.jwtSecret'),
+        expiresIn: this.configService.getOrThrow<string>(
+          'app.jwtExpiresIn',
+        ) as never,
+      },
     );
+    const refreshToken = await this.jwtService.signAsync(
+      { ...payload, jti: randomUUID() },
+      {
+        secret: this.configService.getOrThrow<string>('app.jwtRefreshSecret'),
+        expiresIn: this.configService.getOrThrow<string>(
+          'app.jwtRefreshExpiresIn',
+        ) as never,
+      },
+    );
+
+    const refreshTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
     await this.authRepository.createRefreshToken({
       userId: payload.sub,
       tokenHash: refreshTokenHash,

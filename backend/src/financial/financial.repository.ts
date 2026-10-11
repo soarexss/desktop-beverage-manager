@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
-import { PrismaService } from "../database/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class FinancialRepository {
@@ -13,15 +13,19 @@ export class FinancialRepository {
   findAll() {
     return this.prisma.financialTransaction.findMany({
       include: {
+        payments: true,
         client: true,
         order: true,
       },
-      orderBy: { dueDate: "asc" },
+      orderBy: { dueDate: 'asc' },
     });
   }
 
   findById(id: string) {
-    return this.prisma.financialTransaction.findUnique({ where: { id } });
+    return this.prisma.financialTransaction.findUnique({
+      where: { id },
+      include: { payments: true },
+    });
   }
 
   update(id: string, data: Prisma.FinancialTransactionUncheckedUpdateInput) {
@@ -34,15 +38,15 @@ export class FinancialRepository {
   summary() {
     return Promise.all([
       this.prisma.financialTransaction.aggregate({
-        where: { type: "RECEIVABLE" },
+        where: { type: 'RECEIVABLE', status: { in: ['PENDING', 'OVERDUE'] } },
         _sum: { amount: true },
       }),
       this.prisma.financialTransaction.aggregate({
-        where: { type: "PAYABLE" },
+        where: { type: 'PAYABLE', status: { in: ['PENDING', 'OVERDUE'] } },
         _sum: { amount: true },
       }),
       this.prisma.financialTransaction.aggregate({
-        where: { status: "PENDING" },
+        where: { status: 'PENDING' },
         _sum: { amount: true },
       }),
     ]);

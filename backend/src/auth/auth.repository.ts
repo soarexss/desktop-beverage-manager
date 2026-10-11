@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../database/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class AuthRepository {
@@ -28,8 +28,23 @@ export class AuthRepository {
         revokedAt: null,
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
+    });
+  }
+
+  async consumeRefreshToken(id: string) {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: { id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count === 1;
+  }
+
+  invalidateSessions(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { sessionVersion: { increment: 1 } },
     });
   }
 

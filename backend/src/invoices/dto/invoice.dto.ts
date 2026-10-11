@@ -1,21 +1,12 @@
-import { PartialType } from "@nestjs/swagger";
-import {
-  IsEnum,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from "class-validator";
+import { InvoiceStatus as InvoiceStatusDto } from '@prisma/client';
+import { IsEntityId } from '../../common/dto/entity-id';
+import { PartialType } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
-export enum InvoiceStatusDto {
-  PENDING = "PENDING",
-  PROCESSING = "PROCESSING",
-  AUTHORIZED = "AUTHORIZED",
-  REJECTED = "REJECTED",
-  CANCELLED = "CANCELLED",
-}
+export { InvoiceStatusDto };
 
 export class CreateInvoiceDto {
-  @IsUUID()
+  @IsEntityId()
   orderId!: string;
 
   @IsOptional()

@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { OrderStatus, Prisma } from "@prisma/client";
-import { PrismaService } from "../database/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { OrderStatus, Prisma } from '@prisma/client';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class OrdersRepository {
@@ -29,7 +29,7 @@ export class OrdersRepository {
         delivery: true,
         invoice: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -38,7 +38,7 @@ export class OrdersRepository {
       where: { id },
       include: {
         client: true,
-        seller: true,
+        seller: { select: { id: true, name: true, email: true } },
         items: {
           include: { product: true },
         },
