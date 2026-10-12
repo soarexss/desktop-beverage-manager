@@ -1,6 +1,7 @@
 const routes: Record<string, string[]> = {
   "/": ["admin", "financeiro"],
   "/cadastros": ["admin", "compras", "estoquista", "financeiro", "fiscal", "vendedor"],
+  "/empresa": ["admin", "fiscal"],
   "/estoque": ["admin", "estoquista", "compras", "vendedor"],
   "/compras": ["admin", "compras"],
   "/vendas": ["admin", "caixa", "vendedor"],

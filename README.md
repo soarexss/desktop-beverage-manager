@@ -18,6 +18,7 @@ Para produção use HTTPS e preferencialmente um proxy de mesma origem: frontend
 ## Operação
 
 - Compras recebidas geram estoque e conta a pagar atomicamente.
+- Empresa e Pix: cadastro administrativo de CNPJ/CNAE/regime/endereço e chave Pix. Compras aceita importação operacional de XML de NF-e 55 com revisão, conversão e confirmação posterior de recebimento; [escopo e preparação fiscal para DF](docs/EMPRESA_PIX_E_ENTRADA_FISCAL.md).
 - Vendas geram saída de estoque e recebível. Dinheiro exige caixa aberto do operador e baixa automaticamente; PIX estático exige conferência. Cartão pode usar o conector Mercado Pago Point ou registro manual com comprovante.
 - Recebimentos parciais mantêm saldo pendente. O conector Point exige configuração OAuth, webhook HTTPS e homologação física; outras provedoras estão disponíveis para registro manual, sem TEF universal.
 - Cancelamento de pedido não pago repõe estoque e cancela títulos/comissões pendentes. Pedidos pagos ou com documento fiscal autorizado/em processamento exigem um fluxo de estorno/devolução, ainda pendente; não são cancelados silenciosamente.
@@ -42,6 +43,6 @@ Os testes de negócio só executam quando `TEST_DATABASE_URL` aponta para um Pos
 
 ## Limites de implantação
 
-**Uma empresa por banco/instância.** O cadastro Company/Branch não implementa isolamento entre clientes; não colocar CNPJs independentes na mesma base. Multiempresa, cobrança da assinatura, conciliação de extratos/liquidação bancária, devoluções/estornos, conversão caixa/unidade, FEFO/lotes, importação fiscal e paginação para bases grandes seguem como trabalho de produto.
+**Uma empresa por banco/instância.** O cadastro Company/Branch não implementa isolamento entre clientes; não colocar CNPJs independentes na mesma base. Multiempresa, cobrança da assinatura, conciliação de extratos/liquidação bancária, devoluções/estornos, conversão geral de embalagens, FEFO/baixa por lote, captura/emissão fiscal homologadas e paginação para bases grandes seguem como trabalho de produto. A conversão explícita da importação XML não substitui um cadastro geral de embalagens.
 
 Agenda, notas pessoais e feedback são locais, separados por usuário; não têm sincronização ou abertura de chamado remoto. Backups devem cobrir o banco; dados locais precisam ser exportados separadamente.

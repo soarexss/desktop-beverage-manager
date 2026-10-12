@@ -23,6 +23,8 @@ import { ReportsModule } from "./reports/reports.module";
 import { RegistriesModule } from "./registries/registries.module";
 import { OperationsModule } from "./operations/operations.module";
 import { CardPaymentsModule } from "./card-payments/card-payments.module";
+import { CompanyProfileModule } from "./company-profile/company-profile.module";
+import { FiscalImportsModule } from "./fiscal-imports/fiscal-imports.module";
 
 @Module({
   imports: [
@@ -46,6 +48,7 @@ import { CardPaymentsModule } from "./card-payments/card-payments.module";
               "req.query.state",
               "req.body.password",
               "req.body.refreshToken",
+              "req.body.xmlContent",
               "res.headers['set-cookie']",
             ],
             censor: "[REDACTED]",
@@ -88,6 +91,8 @@ import { CardPaymentsModule } from "./card-payments/card-payments.module";
     RegistriesModule,
     OperationsModule,
     CardPaymentsModule,
+    CompanyProfileModule,
+    FiscalImportsModule,
   ],
   providers: [
     {

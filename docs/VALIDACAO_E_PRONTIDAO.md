@@ -1,5 +1,7 @@
 # Validação e prontidão — 11/10/2026
 
+Atualizações de 12/10/2026: conector e limites de cartão em [Maquininhas](MAQUININHAS.md); configuração de empresa/Pix e importação operacional XML em [Empresa, Pix e entrada fiscal](EMPRESA_PIX_E_ENTRADA_FISCAL.md), com 32 testes unitários e 32 de integração aprovados. As evidências de 11/10 abaixo são históricas e não substituem os limites dessas entregas. Emissão/captura fiscal homologadas continuam pendentes.
+
 ## Resultado
 
 A base operacional foi corrigida e exercitada com PostgreSQL real descartável. Isso permite avançar para homologação de um piloto da distribuidora. Não é uma declaração de ERP completo, segurança absoluta ou homologação fiscal/bancária.

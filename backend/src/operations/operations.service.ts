@@ -117,6 +117,7 @@ export class OperationsService {
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
         items: { include: { product: true } },
+        fiscalImport: { select: { id: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -159,6 +160,18 @@ export class OperationsService {
         return existing;
       }
 
+      if (
+        dto.accessKey?.trim() &&
+        ((await transaction.fiscalImport.findUnique({
+          where: { accessKey: dto.accessKey.trim() },
+        })) ||
+          (await transaction.purchaseOrder.findFirst({
+            where: { accessKey: dto.accessKey.trim() },
+          })))
+      )
+        throw new BadRequestException(
+          'Nota já vinculada a uma compra; confira a entrada existente',
+        );
       const created = await transaction.purchaseOrder.create({
         data: {
           requestId: dto.requestId,
@@ -166,7 +179,7 @@ export class OperationsService {
           supplierId: dto.supplierId,
           supplierName: dto.supplierName,
           invoiceNumber: dto.invoiceNumber,
-          accessKey: dto.accessKey,
+          accessKey: dto.accessKey?.trim(),
           subtotal,
           freightAmount,
           discountAmount,
@@ -259,7 +272,7 @@ export class OperationsService {
             type: 'PAYABLE',
             amount: purchase.totalAmount,
             description: `Compra ${id} - ${purchase.supplierName}`,
-            dueDate: new Date(),
+            dueDate: purchase.dueDate ?? new Date(),
             createdById: user.sub,
           },
         });

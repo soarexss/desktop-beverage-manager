@@ -14,6 +14,7 @@ import { Route as AjudaRouteImport } from './routes/ajuda'
 import { Route as CadastrosRouteImport } from './routes/cadastros'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as ComprasRouteImport } from './routes/compras'
+import { Route as EmpresaRouteImport } from './routes/empresa'
 import { Route as EntregasRouteImport } from './routes/entregas'
 import { Route as EstoqueRouteImport } from './routes/estoque'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
@@ -46,6 +47,11 @@ const ClientesRoute = ClientesRouteImport.update({
 const ComprasRoute = ComprasRouteImport.update({
   id: '/compras',
   path: '/compras',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmpresaRoute = EmpresaRouteImport.update({
+  id: '/empresa',
+  path: '/empresa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EntregasRoute = EntregasRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/cadastros': typeof CadastrosRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/empresa': typeof EmpresaRoute
   '/entregas': typeof EntregasRoute
   '/estoque': typeof EstoqueRoute
   '/financeiro': typeof FinanceiroRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/cadastros': typeof CadastrosRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/empresa': typeof EmpresaRoute
   '/entregas': typeof EntregasRoute
   '/estoque': typeof EstoqueRoute
   '/financeiro': typeof FinanceiroRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/cadastros': typeof CadastrosRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/empresa': typeof EmpresaRoute
   '/entregas': typeof EntregasRoute
   '/estoque': typeof EstoqueRoute
   '/financeiro': typeof FinanceiroRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/cadastros'
     | '/clientes'
     | '/compras'
+    | '/empresa'
     | '/entregas'
     | '/estoque'
     | '/financeiro'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/cadastros'
     | '/clientes'
     | '/compras'
+    | '/empresa'
     | '/entregas'
     | '/estoque'
     | '/financeiro'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/cadastros'
     | '/clientes'
     | '/compras'
+    | '/empresa'
     | '/entregas'
     | '/estoque'
     | '/financeiro'
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   CadastrosRoute: typeof CadastrosRoute
   ClientesRoute: typeof ClientesRoute
   ComprasRoute: typeof ComprasRoute
+  EmpresaRoute: typeof EmpresaRoute
   EntregasRoute: typeof EntregasRoute
   EstoqueRoute: typeof EstoqueRoute
   FinanceiroRoute: typeof FinanceiroRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/compras'
       fullPath: '/compras'
       preLoaderRoute: typeof ComprasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/empresa': {
+      id: '/empresa'
+      path: '/empresa'
+      fullPath: '/empresa'
+      preLoaderRoute: typeof EmpresaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/entregas': {
@@ -301,6 +321,7 @@ const rootRouteChildren: RootRouteChildren = {
   CadastrosRoute: CadastrosRoute,
   ClientesRoute: ClientesRoute,
   ComprasRoute: ComprasRoute,
+  EmpresaRoute: EmpresaRoute,
   EntregasRoute: EntregasRoute,
   EstoqueRoute: EstoqueRoute,
   FinanceiroRoute: FinanceiroRoute,

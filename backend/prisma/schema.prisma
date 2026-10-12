@@ -354,6 +354,16 @@ model RegistryEntry {
 }
 
 model Company {
+  operationalKey        String?  @unique
+  primaryCnae           String?
+  secondaryCnaes        String[] @default([])
+  municipalityCode      String?
+  postalCode            String?
+  pixEnabled            Boolean  @default(false)
+  pixKey                String?
+  pixMerchantName       String?
+  pixMerchantCity       String?
+  fiscalImports         FiscalImport[]
   id                    String   @id @default(cuid())
   legalName             String
   tradeName             String
@@ -416,6 +426,8 @@ model ProductPrice {
 }
 
 model PurchaseOrder {
+  fiscalImport FiscalImport?
+  dueDate DateTime?
   requestId      String?             @unique
   financialTransaction FinancialTransaction?
   id             String              @id @default(cuid())
@@ -436,6 +448,7 @@ model PurchaseOrder {
   items          PurchaseOrderItem[]
 
   @@index([supplierId, status])
+  @@index([accessKey])
   @@index([createdAt])
 }
 
@@ -653,4 +666,16 @@ model TerminalCharge {
 
   @@index([orderId, createdAt])
   @@index([status, updatedAt])
+}
+
+model FiscalImport {
+  id              String        @id @default(cuid())
+  accessKey       String        @unique
+  xmlHash         String
+  xmlContent      String        @db.Text
+  companyId       String
+  purchaseOrderId String        @unique
+  createdAt       DateTime      @default(now())
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
 }

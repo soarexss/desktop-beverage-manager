@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useMemo, useState } from "react";
 import { ClipboardList, PackageCheck, Plus, RefreshCw } from "lucide-react";
 import { Panel, Field, StatusBadge } from "@/components/erp";
+import { NfeImportPanel } from "@/components/nfe-import-panel";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { datePt, money, numberPt } from "@/lib/format";
 
@@ -27,6 +28,7 @@ type PurchaseOrder = {
   invoiceNumber?: string | null;
   totalAmount: string | number;
   receivedAt?: string | null;
+  fiscalImport?: { id: string } | null;
   createdAt: string;
   items: Array<{
     id: string;
@@ -46,6 +48,7 @@ type PriceTable = {
 };
 
 function Compras() {
+  const [downloadError, setDownloadError] = useState("");
   const queryClient = useQueryClient();
   const products = useQuery({
     queryKey: ["products"],
@@ -126,6 +129,25 @@ function Compras() {
     setUnitCost(Number(product?.cost ?? 0));
   }
 
+  async function downloadXml(id: string) {
+    setDownloadError("");
+    try {
+      const data = await apiGet<{ xmlContent: string; accessKey: string }>(
+        `/fiscal-imports/${id}/xml`,
+      );
+      const url = URL.createObjectURL(
+        new Blob([data.xmlContent], { type: "application/xml;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${data.accessKey}.xml`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : "Falha ao baixar XML");
+    }
+  }
+
   return (
     <div className="grid grid-cols-12 gap-3">
       <div className="col-span-12 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -153,6 +175,17 @@ function Compras() {
         </div>
       </div>
 
+      <NfeImportPanel products={products.data ?? []} />
+      {downloadError && (
+        <p className="col-span-12 text-destructive" role="alert">
+          {downloadError}
+        </p>
+      )}
+      {receivePurchase.isError && (
+        <p className="col-span-12 text-destructive" role="alert">
+          {receivePurchase.error.message}
+        </p>
+      )}
       <Panel className="col-span-12 lg:col-span-4" title="Entrada de mercadorias">
         <form className="space-y-2" onSubmit={submit}>
           <Field label="Fornecedor">
@@ -273,8 +306,16 @@ function Compras() {
                     <button
                       className="erp-btn px-2 py-0.5"
                       onClick={() => receivePurchase.mutate(purchase.id)}
+                      disabled={receivePurchase.isPending}
+                      title="Confirmar recebimento: gera estoque e conta a pagar"
                     >
                       <PackageCheck className="h-3 w-3" />
+                      Confirmar recebimento
+                    </button>
+                  )}
+                  {purchase.fiscalImport && (
+                    <button className="erp-btn ml-1" onClick={() => void downloadXml(purchase.id)}>
+                      Baixar XML
                     </button>
                   )}
                 </td>

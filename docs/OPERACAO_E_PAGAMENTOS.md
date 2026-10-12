@@ -2,7 +2,7 @@
 
 ## QR Code direto para o lojista
 
-Configure no backend `PIX_KEY`, `PIX_MERCHANT_NAME` e `PIX_MERCHANT_CITY`. O nome deve corresponder ao recebedor e a chave deve estar cadastrada no banco dele. O aplicativo bancário consulta o recebedor real associado à chave; o ERP não verifica titularidade no DICT.
+Configure em **Empresa e Pix** a chave, o nome, a cidade e a habilitação do Pix. As variáveis do backend `PIX_KEY`, `PIX_MERCHANT_NAME` e `PIX_MERCHANT_CITY` continuam como compatibilidade somente enquanto não há empresa operacional configurada. A configuração administrativa prevalece e sua desativação bloqueia a geração. O nome deve corresponder ao recebedor e a chave deve estar cadastrada no banco dele. O aplicativo bancário consulta o recebedor real associado à chave; o ERP não verifica titularidade no DICT. Veja [cadastro e entrada fiscal](EMPRESA_PIX_E_ENTRADA_FISCAL.md).
 
 `GET /v1/orders/:id/pix` exige sessão, autorização sobre o pedido e saldo em aberto. Retorna `copyPaste`, `qrCode` (PNG data URL), `amount`, `txid`, `merchantName`, `confirmation: MANUAL` e mensagem de conferência. Usa o saldo restante e ID do pedido como txid. Gerar/copiar/exibir código não registra pagamento. QR estático não expira automaticamente e pode ser reutilizado: sempre conferir valor, identificação e recebimento no banco. Um código antigo pode ter valor diferente depois de pagamento parcial.
 
@@ -53,6 +53,7 @@ Backups: usar `pg_dump --format=custom --file=...` com credenciais fornecidas po
 Atualização de 12/10/2026: o conector Mercado Pago Point e o cadastro de maquininhas foram implementados; configuração, contratos, evidências e limites estão em [Maquininhas](MAQUININHAS.md). As afirmações de ausência de confirmação automática acima se referem ao PIX estático e às baixas manuais. Cobranças Point usam confirmação consultada na conta autorizada, após configuração/homologação.
 
 - Provedor NF-e/NFC-e e parametrização fiscal homologada com o contador/cliente.
+- Cadastro de empresa/regimes/Pix e importação operacional de XML 55 foram implementados; captura Sefaz, assinatura/XSD, emissão, parcelas e escrituração seguem pendentes. Escopo e fontes DF em [Empresa, Pix e entrada fiscal](EMPRESA_PIX_E_ENTRADA_FISCAL.md).
 - Estorno/devolução de pedidos pagos e fluxo de devolução fiscal. O cancelamento é bloqueado para evitar perda de rastreabilidade.
 - Homologação física/credenciais do conector Point, conectores automáticos das demais marcas/TEF e conciliação de liquidação bancária; baixa manual de PIX/cartão não consulta o banco.
 - Multiempresa e multiestoque reais, conversão unidade/caixa, seleção/baixa por lote e validade, troco, múltiplos meios e parcelamento.

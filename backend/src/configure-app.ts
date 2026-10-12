@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { json } from 'express';
 
 import compression from 'compression';
 
@@ -28,6 +29,7 @@ export function configureApp(app: INestApplication) {
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('v1');
+  app.use(json({ limit: '768kb' }));
 
   app.use(
     helmet({

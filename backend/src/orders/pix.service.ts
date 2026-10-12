@@ -97,9 +97,20 @@ export class PixService {
     );
     if (amount.lessThanOrEqualTo(0))
       throw new BadRequestException('Pedido sem saldo a receber');
-    const key = this.config.get<string>('PIX_KEY');
-    const name = this.config.get<string>('PIX_MERCHANT_NAME');
-    const city = this.config.get<string>('PIX_MERCHANT_CITY');
+    const company = await this.prisma.company.findUnique({
+      where: { operationalKey: 'PRIMARY' },
+    });
+    if (company && !company.pixEnabled)
+      throw new ServiceUnavailableException(
+        'Pix desativado na configuração da empresa',
+      );
+    const key = company ? company.pixKey : this.config.get<string>('PIX_KEY');
+    const name = company
+      ? company.pixMerchantName
+      : this.config.get<string>('PIX_MERCHANT_NAME');
+    const city = company
+      ? company.pixMerchantCity
+      : this.config.get<string>('PIX_MERCHANT_CITY');
     if (!key || !name || !city)
       throw new ServiceUnavailableException(
         'PIX não configurado. Solicite ao administrador a chave, nome e cidade do lojista.',

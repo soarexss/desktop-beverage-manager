@@ -41,6 +41,7 @@ import { useAuth } from "./auth-context";
 const modules = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, key: "F1" },
   { to: "/cadastros", label: "Cadastros", icon: Building2, key: "F2" },
+  { to: "/empresa", label: "Empresa e Pix", icon: Building2, key: "" },
   { to: "/estoque", label: "Estoque", icon: Package, key: "F3" },
   { to: "/compras", label: "Compras", icon: ClipboardList, key: "F4" },
   { to: "/vendas", label: "Vendas / PDV", icon: ShoppingCart, key: "F5" },
