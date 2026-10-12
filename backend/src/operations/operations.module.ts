@@ -8,5 +8,6 @@ import { OperationsService } from "./operations.service";
   imports: [AuditModule, PrismaModule],
   controllers: [OperationsController],
   providers: [OperationsService],
+  exports: [OperationsService],
 })
 export class OperationsModule {}

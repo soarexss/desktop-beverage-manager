@@ -22,6 +22,7 @@ import { InvoicesModule } from "./invoices/invoices.module";
 import { ReportsModule } from "./reports/reports.module";
 import { RegistriesModule } from "./registries/registries.module";
 import { OperationsModule } from "./operations/operations.module";
+import { CardPaymentsModule } from "./card-payments/card-payments.module";
 
 @Module({
   imports: [
@@ -39,6 +40,10 @@ import { OperationsModule } from "./operations/operations.module";
           redact: {
             paths: [
               "req.headers.authorization",
+              "req.headers.cookie",
+              "req.url",
+              "req.query.code",
+              "req.query.state",
               "req.body.password",
               "req.body.refreshToken",
               "res.headers['set-cookie']",
@@ -82,6 +87,7 @@ import { OperationsModule } from "./operations/operations.module";
     ReportsModule,
     RegistriesModule,
     OperationsModule,
+    CardPaymentsModule,
   ],
   providers: [
     {

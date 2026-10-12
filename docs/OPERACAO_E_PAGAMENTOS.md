@@ -50,9 +50,11 @@ Backups: usar `pg_dump --format=custom --file=...` com credenciais fornecidas po
 
 ## Pendências de produto
 
+Atualização de 12/10/2026: o conector Mercado Pago Point e o cadastro de maquininhas foram implementados; configuração, contratos, evidências e limites estão em [Maquininhas](MAQUININHAS.md). As afirmações de ausência de confirmação automática acima se referem ao PIX estático e às baixas manuais. Cobranças Point usam confirmação consultada na conta autorizada, após configuração/homologação.
+
 - Provedor NF-e/NFC-e e parametrização fiscal homologada com o contador/cliente.
 - Estorno/devolução de pedidos pagos e fluxo de devolução fiscal. O cancelamento é bloqueado para evitar perda de rastreabilidade.
-- API de pagamentos/TEF, webhook e conciliação; banco não é atualizado automaticamente por baixa manual de PIX/cartão.
+- Homologação física/credenciais do conector Point, conectores automáticos das demais marcas/TEF e conciliação de liquidação bancária; baixa manual de PIX/cartão não consulta o banco.
 - Multiempresa e multiestoque reais, conversão unidade/caixa, seleção/baixa por lote e validade, troco, múltiplos meios e parcelamento.
 - Paginação/filtros no servidor, importação e exportação operacional, sincronização de agenda/feedback.
 - Hospedagem SSR, backup automatizado criptografado, monitoramento e atendimento com compromissos definidos.

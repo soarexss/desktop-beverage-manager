@@ -114,6 +114,8 @@ enum CashMovementType {
 }
 
 model User {
+  paymentOAuthAttempts PaymentOAuthAttempt[]
+  terminalCharges TerminalCharge[]
   id                  String                 @id @default(cuid())
   name                String
   email               String                 @unique
@@ -233,6 +235,7 @@ model InventoryMovement {
 }
 
 model Order {
+  terminalCharges       TerminalCharge[]
   requestId             String?                @unique
   id                    String                 @id @default(cuid())
   clientId              String
@@ -289,6 +292,7 @@ model Delivery {
 }
 
 model FinancialTransaction {
+  terminalCharges TerminalCharge[]
   purchaseOrderId String? @unique
   purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   id          String          @id @default(cuid())
@@ -486,6 +490,9 @@ model CashMovement {
 }
 
 model Payment {
+  terminalId             String?
+  terminal               PaymentTerminal? @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  terminalCharge         TerminalCharge?
   requestId              String?               @unique
   id                     String                @id @default(cuid())
   orderId                String?
@@ -561,4 +568,89 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([entityType, entityId])
+}
+
+model PaymentConnection {
+  id          String   @id @default(cuid())
+  provider    String   @unique
+  merchantId  String
+  credentials String
+  expiresAt   DateTime
+  liveMode    Boolean
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  terminals   PaymentTerminal[]
+  charges     TerminalCharge[]
+}
+
+model PaymentOAuthAttempt {
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  id        String   @id @default(cuid())
+  stateHash String   @unique
+  actorId   String
+  verifier  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model PaymentTerminal {
+  payments     Payment[]
+  id           String   @id @default(cuid())
+  provider     String
+  model        String
+  label        String
+  mode         String
+  externalId   String?
+  connectionId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  connection   PaymentConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  charges      TerminalCharge[]
+
+  @@unique([provider, externalId])
+  @@index([isActive, mode])
+}
+
+enum TerminalChargeStatus {
+  CREATING
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+  REVIEW
+}
+
+model TerminalCharge {
+  externalPaymentId      String? @unique
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  id                     String @id @default(cuid())
+  requestId              String @unique
+  orderId                String
+  financialTransactionId String
+  terminalId             String
+  connectionId           String
+  createdById            String
+  merchantId             String
+  externalTerminalId     String
+  amount                 Decimal @db.Decimal(12, 2)
+  status                 TerminalChargeStatus @default(CREATING)
+  externalId             String? @unique
+  paymentId              String? @unique
+  cancellationRequested  Boolean @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  order                  Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  financialTransaction   FinancialTransaction @relation(fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  terminal               PaymentTerminal @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  connection             PaymentConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  payment                Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@index([status, updatedAt])
 }

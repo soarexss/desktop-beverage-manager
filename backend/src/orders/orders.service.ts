@@ -261,6 +261,17 @@ export class OrdersService {
         throw new BadRequestException('Atualize pelo fluxo de entregas');
       if (dto.status === 'CANCELLED') {
         if (
+          await tx.terminalCharge.count({
+            where: {
+              orderId: id,
+              status: { in: ['CREATING', 'PENDING', 'REVIEW'] },
+            },
+          })
+        )
+          throw new BadRequestException(
+            'Concilie ou cancele a cobrança da maquininha antes de cancelar o pedido',
+          );
+        if (
           order.payments.length ||
           (order.invoice &&
             ['PROCESSING', 'AUTHORIZED'].includes(order.invoice.status))

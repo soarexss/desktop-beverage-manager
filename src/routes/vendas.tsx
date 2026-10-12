@@ -1,4 +1,5 @@
 import { useAuth } from "@/components/auth-context";
+import { CardPaymentPanel } from "@/components/card-payment-panel";
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -380,9 +381,13 @@ function Vendas() {
           </div>
 
           <p className="mt-2 text-xs text-muted-foreground">
-            Dinheiro baixa no caixa aberto. PIX/cartão ficam pendentes até conferência em
-            Financeiro.
+            Dinheiro baixa no caixa aberto. PIX exige conferência. Cartão pode usar uma maquininha
+            integrada ou registro manual do comprovante.
           </p>
+
+          {lastOrder && lastOrder.status !== "CANCELLED" && (
+            <CardPaymentPanel key={lastOrder.id} orderId={lastOrder.id} />
+          )}
 
           {pix && lastOrder && pix.txid === lastOrder.id && (
             <div className="mt-3 border p-3">

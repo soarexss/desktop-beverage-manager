@@ -47,6 +47,7 @@ const modules = [
   { to: "/clientes", label: "Clientes", icon: Users, key: "F6" },
   { to: "/entregas", label: "Entregas", icon: Truck, key: "F7" },
   { to: "/financeiro", label: "Financeiro", icon: Wallet, key: "F8" },
+  { to: "/maquininhas", label: "Maquininhas", icon: Wallet, key: "" },
 
   { to: "/notas", label: "Pendências fiscais", icon: FileText, key: "F9" },
 

@@ -160,6 +160,9 @@ export class CreateCashMovementDto {
 }
 
 export class CreatePaymentDto {
+  @IsOptional()
+  @IsEntityId()
+  terminalId?: string;
   @IsUUID()
   requestId!: string;
   @IsOptional()

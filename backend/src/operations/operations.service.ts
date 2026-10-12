@@ -458,11 +458,49 @@ export class OperationsService {
         if (existing.createdById !== user.sub)
           throw new BadRequestException('Identificador já utilizado');
 
+        if (
+          existing.financialTransactionId !== dto.financialTransactionId ||
+          existing.methodName !== dto.methodName ||
+          !existing.amount.equals(dto.amount) ||
+          existing.terminalId !== (dto.terminalId ?? null) ||
+          existing.nsu !== (dto.nsu ?? null) ||
+          (dto.orderId && existing.orderId !== dto.orderId)
+        )
+          throw new BadRequestException(
+            'Identificador utilizado em outro pagamento',
+          );
+
         return existing;
       }
 
       if (!dto.financialTransactionId)
         throw new BadRequestException('Selecione um título financeiro');
+
+      if (
+        await transaction.terminalCharge.count({
+          where: {
+            financialTransactionId: dto.financialTransactionId,
+            status: { in: ['CREATING', 'PENDING', 'REVIEW'] },
+          },
+        })
+      )
+        throw new BadRequestException(
+          'Cobrança na maquininha em andamento. Concilie ou cancele no provedor antes da baixa manual.',
+        );
+      if (dto.terminalId) {
+        const terminal = await transaction.paymentTerminal.findUnique({
+          where: { id: dto.terminalId },
+        });
+        if (
+          !terminal?.isActive ||
+          terminal.mode !== 'MANUAL' ||
+          dto.methodName !== 'CARTAO' ||
+          !dto.nsu?.trim()
+        )
+          throw new BadRequestException(
+            'Registro manual exige terminal manual ativo, cartão e referência do comprovante',
+          );
+      }
 
       const title = await transaction.financialTransaction.findUnique({
         where: { id: dto.financialTransactionId },

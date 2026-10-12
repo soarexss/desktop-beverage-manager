@@ -18,8 +18,8 @@ Para produção use HTTPS e preferencialmente um proxy de mesma origem: frontend
 ## Operação
 
 - Compras recebidas geram estoque e conta a pagar atomicamente.
-- Vendas geram saída de estoque e recebível. Dinheiro exige caixa aberto do operador e baixa automaticamente; PIX/cartão exigem conferência em Financeiro.
-- Recebimentos parciais mantêm saldo pendente. Não há integração TEF ou confirmação bancária automática nesta versão.
+- Vendas geram saída de estoque e recebível. Dinheiro exige caixa aberto do operador e baixa automaticamente; PIX estático exige conferência. Cartão pode usar o conector Mercado Pago Point ou registro manual com comprovante.
+- Recebimentos parciais mantêm saldo pendente. O conector Point exige configuração OAuth, webhook HTTPS e homologação física; outras provedoras estão disponíveis para registro manual, sem TEF universal.
 - Cancelamento de pedido não pago repõe estoque e cancela títulos/comissões pendentes. Pedidos pagos ou com documento fiscal autorizado/em processamento exigem um fluxo de estorno/devolução, ainda pendente; não são cancelados silenciosamente.
 - Entregas podem ser atribuídas pelo administrador e avançadas pelo entregador responsável. A abertura de endereço em mapa externo é opcional; não há otimização automática de rota.
 - Fiscal: apenas pendências internas. NF-e/NFC-e, assinatura de XML, autorização, DANFE e cancelamento fiscal dependem de provedor próprio. Não confundir com NFS-e de serviços.
@@ -28,7 +28,11 @@ Para produção use HTTPS e preferencialmente um proxy de mesma origem: frontend
 
 Veja [contrato e implantação](docs/OPERACAO_E_PAGAMENTOS.md). QR estático local já funciona com chave do lojista; não passa por conta do ERP ou gateway. A baixa é manual após conferir no banco.
 
-## Validação
+## Maquininhas
+
+Veja [modelos, configuração e limites](docs/MAQUININHAS.md). A tela permite vários aparelhos por loja, com catálogo de Mercado Pago, PagBank, Stone/Ton, Cielo, Rede e SumUp. Point Smart 1/2 e Pro 2/3 compartilham o conector implementado; as demais marcas usam conferência manual. A ativação real depende de credenciais e testes no terminal do lojista.
+
+## Validação técnica
 
 Frontend: `npx tsc --noEmit`, `npm run build`, `npm run lint`.
 
@@ -38,6 +42,6 @@ Os testes de negócio só executam quando `TEST_DATABASE_URL` aponta para um Pos
 
 ## Limites de implantação
 
-**Uma empresa por banco/instância.** O cadastro Company/Branch não implementa isolamento entre clientes; não colocar CNPJs independentes na mesma base. Multiempresa, cobrança da assinatura, conciliação automática, devoluções/estornos, conversão caixa/unidade, FEFO/lotes, importação fiscal e paginação para bases grandes seguem como trabalho de produto.
+**Uma empresa por banco/instância.** O cadastro Company/Branch não implementa isolamento entre clientes; não colocar CNPJs independentes na mesma base. Multiempresa, cobrança da assinatura, conciliação de extratos/liquidação bancária, devoluções/estornos, conversão caixa/unidade, FEFO/lotes, importação fiscal e paginação para bases grandes seguem como trabalho de produto.
 
 Agenda, notas pessoais e feedback são locais, separados por usuário; não têm sincronização ou abertura de chamado remoto. Backups devem cobrir o banco; dados locais precisam ser exportados separadamente.
