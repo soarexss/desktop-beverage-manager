@@ -6,4 +6,15 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-export default defineConfig();
+export default defineConfig({
+  vite: {
+    server: {
+      proxy: {
+        "/v1": {
+          target: process.env.API_PROXY_TARGET || "http://127.0.0.1:3001",
+          changeOrigin: false,
+        },
+      },
+    },
+  },
+});

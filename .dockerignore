@@ -1,0 +1,17 @@
+node_modules
+backend
+.git
+.codex
+.env
+.env.*
+dist
+.output
+.tanstack
+.wrangler
+.nitro
+docs
+scripts
+*.log
+*.dump
+*.backup
+.local-backups

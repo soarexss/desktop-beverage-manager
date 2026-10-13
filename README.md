@@ -4,11 +4,15 @@ ERP para operação de uma loja/distribuidora por instância, com React/TanStack
 
 ## Executar
 
-Requer Node.js 22.12+ e npm, além de PostgreSQL 16.
+**Docker completo:** na raiz, execute `docker compose up -d --build --wait` e abra **http://127.0.0.1:5188**. Banco, backend e frontend iniciam juntos no grupo `distribev`. Não precisa executar npm no Windows nem configurar `VITE_API_URL` manualmente. Primeira instalação, contas, volumes e diagnóstico: [DOCKER.md](docs/DOCKER.md).
+
+### Execução manual opcional
+
+Requer Node.js 22.12+ e npm, além de PostgreSQL 16. Não execute servidores manuais simultaneamente com a stack Docker nas mesmas portas.
 
 1. Em `backend`, execute `npm ci` e configure `.env` a partir de `.env.example`.
-2. Configure uma senha exclusiva do PostgreSQL e uma `DATABASE_URL` correspondente. O Compose publica o banco somente em localhost.
-3. Execute `docker compose up -d`, `npm run prisma:generate` e `npm run prisma:deploy`.
+2. Configure uma senha exclusiva do PostgreSQL e uma `DATABASE_URL` correspondente ao seu banco.
+3. Com seu PostgreSQL disponível, execute `npm run prisma:generate` e `npm run prisma:deploy`.
 4. Configure `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ caracteres) e opcionalmente `ADMIN_NAME`; execute `npm run admin:create`. Não há administrador ou senha padrão em produção.
 5. Execute `npm run build` e `npm run start:prod` no backend.
 6. Na raiz, execute `npm ci`, configure `VITE_API_URL` e inicie `npm run dev`. Use o mesmo hostname para frontend/API no desenvolvimento (não misture localhost e 127.0.0.1).
@@ -35,7 +39,7 @@ Veja [modelos, configuração e limites](docs/MAQUININHAS.md). A tela permite v�
 
 ## Validação técnica
 
-Aplicativo Android e ambiente separado para gravar demonstrações: [Gravação e Android](docs/GRAVACAO_E_ANDROID.md). O Compose atual contém somente PostgreSQL; backend e frontend rodam por npm.
+Aplicativo Android e gravação de demonstrações: [Gravação e Android](docs/GRAVACAO_E_ANDROID.md). O Compose inicia banco, backend e frontend como uma stack única.
 
 Frontend: `npx tsc --noEmit`, `npm run build`, `npm run lint`.
 
