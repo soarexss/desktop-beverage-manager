@@ -35,6 +35,8 @@ Veja [modelos, configuração e limites](docs/MAQUININHAS.md). A tela permite v�
 
 ## Validação técnica
 
+Aplicativo Android e ambiente separado para gravar demonstrações: [Gravação e Android](docs/GRAVACAO_E_ANDROID.md). O Compose atual contém somente PostgreSQL; backend e frontend rodam por npm.
+
 Frontend: `npx tsc --noEmit`, `npm run build`, `npm run lint`.
 
 Backend: `npm run build`, `npm test -- --runInBand`, `npm run test:e2e -- --runInBand`, `npm run lint` (sem alterações automáticas).
